@@ -1,0 +1,12 @@
+Ep: 0, Reward: -63.1882, Avg: -63.1882
+Ep: 1, Reward: 119.9670, Avg: 28.3894
+Ep: 2, Reward: 161.1011, Avg: 72.6266
+Ep: 3, Reward: 329.7396, Avg: 136.9049
+Ep: 4, Reward: 427.3125, Avg: 194.9864
+Ep: 5, Reward: 334.7877, Avg: 218.2866
+Ep: 6, Reward: 272.0965, Avg: 225.9737
+Ep: 7, Reward: 290.1262, Avg: 233.9928
+Ep: 8, Reward: 357.0995, Avg: 247.6713
+Ep: 9, Reward: 354.3078, Avg: 258.3350
+Ep: 10, Reward: 260.1981, Avg: 258.5043
+Ep: 11, Reward: 48.3447, Avg: 240.9910
