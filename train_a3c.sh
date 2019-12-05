@@ -37,8 +37,8 @@ run()
 
 # run 16 500 ddpg -1
 # run 16 500 ddpg 0
-# run 16 500 ddpg 1
+run 16 500 ddpg 1
 
-run 16 250 ppo -1
+# run 16 250 ppo -1
 # run 16 250 ppo 0
 # run 16 250 ppo 1

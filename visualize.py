@@ -26,7 +26,7 @@ def evaluate_best(runs=1, gpu=True):
 		dirname = "pytorch" if iternum < 0 else f"iter{iternum}/"
 		for model in [DDPGAgent, PPOAgent]:
 			statemodel = ImgStack if iternum < 0 else WorldModel
-			agent = WorldACAgent(env.action_space.shape, 1, model, statemodel, load=dirname, gpu=gpu)
+			agent = WorldACAgent(env.action_space.shape, 1, model, statemodel, load=dirname, gpu=gpu, train=False)
 			scores = [rollout(env, agent) for _ in range(runs)]
 			mean = np.mean(scores)
 			std = np.std(scores)
@@ -124,6 +124,7 @@ def visualize_qlearning(gpu=False, save="./tests/qlearning.avi"):
 
 if __name__ == "__main__":
 	dirname = os.path.join(ROOT, f"iter{args.iternum}/")
+	evaluate_best()
 	# visualize_vae(100, dirname)
 	# visualize_mdrnn(200, dirname)
 	# visualize_controller(f"iter{args.iternum}/")

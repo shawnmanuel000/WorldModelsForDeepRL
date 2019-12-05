@@ -21,10 +21,10 @@ args = parser.parse_args()
 ENV_NAME = "CarRacing-v0"
 
 class WorldACAgent(RandomAgent):
-	def __init__(self, action_size, num_envs, acagent, statemodel=WorldModel, load="", gpu=True):
+	def __init__(self, action_size, num_envs, acagent, statemodel=WorldModel, load="", gpu=True, train=True):
 		super().__init__(action_size)
 		self.world_model = statemodel(action_size, num_envs, load=load, gpu=gpu)
-		self.acagent = acagent(self.world_model.state_size, action_size, load="", gpu=gpu)
+		self.acagent = acagent(self.world_model.state_size, action_size, load="" if train else load, gpu=gpu)
 
 	def get_env_action(self, env, state, eps=None):
 		state, latent = self.world_model.get_state(state)

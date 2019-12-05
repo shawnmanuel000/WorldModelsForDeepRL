@@ -7,13 +7,13 @@ from collections import deque
 ctrl0 = "logs_10.txt"
 ctrl1 = "logs_9.txt"
 
-ddpg = "logs_9.txt"
-ddpg0 = "logs_7.txt"
+ddpg = "logs_11.txt"
+ddpg0 = "logs_10.txt"
 ddpg1 = "logs_8.txt"
 
-ppo = "logs_9.txt"
-ppo0 = "logs_8.txt"
-ppo1 = "logs_7.txt"
+ppo = "logs_10.txt"
+ppo0 = "logs_11.txt"
+ppo1 = "logs_12.txt"
 
 ctrls = [ctrl0, ctrl1]
 ddpgs = [ddpg0, ddpg1, ddpg]
@@ -37,7 +37,7 @@ def read_a3c(path="./logs/qlearning/logs_3.txt"):
 	avgs = []
 	with open(path, "r") as f:
 		for line in f:
-			match = re.match(".*Test: (.*), Avg: (.*)", line.strip('\n'))
+			match = re.match("Ep.*Test: (.*), Avg: ([^ ]*)", line.strip('\n'))
 			if match:
 				rewards.append(float(match.groups()[0]))
 				avgs.append(float(match.groups()[1]))
@@ -56,6 +56,7 @@ def graph_ctrl():
 	plt.title("World Model Rewards")
 	plt.xlabel("Iteration")
 	plt.ylabel("Best Total Score")
+	plt.grid(linewidth=0.3, linestyle='-')
 
 def graph_a3c(model="ddpg", logs=ddpgs):
 	# _, ravgs = read_a3c("./logs/qlearning/random.txt")
@@ -68,10 +69,11 @@ def graph_a3c(model="ddpg", logs=ddpgs):
 	plt.plot(range(len(qavgs[1])), qavgs[1], color="#FF0000", label="Avg Using WM Improved")
 	# plt.plot(range(len(ravgs[:len(rewards[0])])), ravgs[:len(rewards[0])], color="#FF0000", label="Avg Random")
 	
-	plt.legend(loc="lower right")
+	plt.legend(loc="upper left" if model=="ppo" else "best")
 	plt.title(f"{model.upper()} Training Rewards")
 	plt.xlabel("Rollout")
 	plt.ylabel("Total Score")
+	plt.grid(linewidth=0.3, linestyle='-')
 
 
 def main():

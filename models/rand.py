@@ -21,11 +21,13 @@ class BrownianNoise:
 		self.reset()
 
 	def reset(self):
-		self.action = np.clip(np.random.randn(*self.size), -1, 1)
-		self.daction_dt = np.random.randn(*self.size)
+		self.action = np.clip(np.random.randn(1, *self.size), -1, 1)
+		self.daction_dt = np.random.randn(1, *self.size)
 
-	def sample(self, scale=1):
-		self.daction_dt = np.random.randn(*self.size)
+	def sample(self, state=None, scale=1):
+		batch = len(state) if state is not None and len(state.shape)%2==0 else 1
+		self.daction_dt = np.random.randn(batch, *self.size)
+		self.action = self.action[0] if len(self.action) != batch else self.action
 		self.action = np.clip(self.action + math.sqrt(self.dt) * self.daction_dt, -1, 1)
 		return self.action * scale
 
@@ -34,7 +36,7 @@ class RandomAgent():
 		self.noise_process = BrownianNoise(action_size)
 
 	def get_action(self, state, eps=None):
-		action = self.noise_process.sample()
+		action = self.noise_process.sample(state)
 		return action
 
 	def get_env_action(self, env, state=None, eps=None):
@@ -59,7 +61,7 @@ class ACAgent(RandomAgent):
 		self.eps = eps
 
 	def get_action(self, state, eps=None, e_greedy=False):
-		action_random = super().get_action(state)
+		action_random = super().get_action(state, eps)
 		return action_random
 
 	def compute_gae(self, last_value, rewards, dones, values, gamma=DISCOUNT_RATE, tau=ADVANTAGE_DECAY):
