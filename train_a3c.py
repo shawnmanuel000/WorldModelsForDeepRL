@@ -24,7 +24,7 @@ class WorldACAgent(RandomAgent):
 	def __init__(self, action_size, num_envs, acagent, statemodel=WorldModel, load="", gpu=True):
 		super().__init__(action_size)
 		self.world_model = statemodel(action_size, num_envs, load=load, gpu=gpu)
-		self.acagent = acagent(self.world_model.state_size, action_size, load="", gpu=gpu)
+		self.acagent = acagent(self.world_model.state_size, action_size, load=load, gpu=gpu)
 
 	def get_env_action(self, env, state, eps=None):
 		state, latent = self.world_model.get_state(state)
@@ -55,7 +55,7 @@ def rollout(env, agent, render=False):
 	with torch.no_grad():
 		while not done:
 			if render: env.render()
-			env_action, = agent.get_env_action(env, [state], 0)[0]
+			env_action = agent.get_env_action(env, state, 0.1)[0]
 			state, reward, done, _ = env.step(env_action.reshape(-1))
 			total_reward += reward
 	return total_reward

@@ -77,7 +77,7 @@ class PTACNetwork():
 		
 	def load_model(self, net="qlearning", dirname="pytorch", name="checkpoint"):
 		filepath = get_checkpoint_path(net, dirname, name)
-		if os.path.exists(filepath):
+		if os.path.exists(filepath.replace(".pth", "_a.pth")):
 			self.actor_local.load_state_dict(torch.load(filepath.replace(".pth", "_a.pth")))
 			self.actor_target.load_state_dict(torch.load(filepath.replace(".pth", "_a.pth")))
 			self.critic_local.load_state_dict(torch.load(filepath.replace(".pth", "_c.pth")))

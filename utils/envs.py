@@ -52,7 +52,7 @@ class ImgStack():
 		self.stack = deque(maxlen=self.stack_len)
 
 	def get_state(self, state):
-		state = np.concatenate([self.process(s) for s in state])
+		state = np.concatenate([self.process(s) for s in state]) if self.num_envs > 1 else self.process(state)
 		while len(self.stack) < self.stack_len: self.stack.append(state)
 		self.stack.append(state)
 		return np.concatenate(self.stack, axis=1), None

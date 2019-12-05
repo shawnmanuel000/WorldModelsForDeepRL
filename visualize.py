@@ -9,15 +9,40 @@ from models.vae import VAE, LATENT_SIZE
 from models.mdrnn import MDRNNCell, HIDDEN_SIZE
 from models.controller import ControlAgent
 from models.ddpg import DDPGAgent
+from models.ppo import PPOAgent
 from utils.misc import IMG_DIM, resize, make_video
+from utils.envs import ImgStack, WorldModel
 from data.loaders import ROOT
+from train_a3c import WorldACAgent, rollout
 
 parser = argparse.ArgumentParser(description='Visualizer')
 parser.add_argument('--iternum', type=int, default=0, help='which port to listen on (as a worker server)')
 args = parser.parse_args()
 
+def evaluate_best(runs=100, gpu=True):
+	env = gym.make("CarRacing-v0")
+	env.env.verbose = 0
+	for iternum in [-1, 0, 1]:
+		dirname = "pytorch" if iternum < 0 else f"iter{iternum}/"
+		for model in [DDPGAgent, PPOAgent]:
+			statemodel = ImgStack if iternum < 0 else WorldModel
+			agent = WorldACAgent(env.action_space.shape, 1, model, statemodel, load=dirname, gpu=gpu)
+			scores = [rollout(env, agent) for _ in range(runs)]
+			mean = np.mean(scores)
+			std = np.std(scores)
+			print(f"It: {iternum}, Model: {model.__name__}, Mean: {mean}, Std: {std}")
+			for ep,score in enumerate(scores): print(f"   Ep: {ep}, Score: {score}")
+
+		if iternum >= 0:
+			agent = ControlAgent(env.action_space.shape, load=dirname, gpu=gpu)
+			scores = [rollout(env, agent) for _ in range(runs)]
+			mean = np.mean(scores)
+			std = np.std(scores)
+			print(f"It {iternum}, Model: Controller, Mean: {mean}, Std: {std}")
+			for ep,score in enumerate(scores): print(f"   Ep: {ep}, Score: {score}")
+	env.close()
+
 def visualize_vae(rollout, path="/home/shawn/Documents/world-models/datasets/carracing/openai/", save="./tests/vae.avi"):
-	
 	images_file = os.path.join(path, f"rollout_{rollout}.npz")
 	vae = VAE()
 	imgs = []
@@ -64,13 +89,13 @@ def visualize_controller(load_dir="pytorch", gpu=False, save="./tests/ctrl.avi")
 def visualize_dream(load_dir="pytorch", gpu=False, save="./tests/dream.avi"):
 	env = gym.make("CarRacing-v0")
 	agent = ControlAgent(env.action_space.shape, gpu=False, load=load_dir)
-	rec = agent.vae.sample()[0]
+	rec = agent.world_model.vae.sample()[0]
 	imgs = []
 	with torch.no_grad():
 		for _ in range(1000):
 			agent.get_env_action(env, rec.astype(np.uint8))
-			nex = agent.mdrnn.get_latents(agent.hidden[0])[0]
-			rec = agent.vae.decoder(nex).squeeze().permute(1,2,0).cpu().detach().numpy()*255
+			nex = agent.world_model.mdrnn.get_latents(agent.world_model.hidden[0])[0]
+			rec = agent.world_model.vae.decoder(nex).squeeze().permute(1,2,0).cpu().detach().numpy()*255
 			imgs.append(rec)
 	make_video(imgs, (IMG_DIM, IMG_DIM), save)
 
@@ -99,6 +124,7 @@ def visualize_qlearning(gpu=False, save="./tests/qlearning.avi"):
 
 if __name__ == "__main__":
 	dirname = os.path.join(ROOT, f"iter{args.iternum}/")
+	evaluate_best()
 	# visualize_vae(100, dirname)
 	# visualize_mdrnn(200, dirname)
 	# visualize_controller(f"iter{args.iternum}/")

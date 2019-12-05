@@ -59,7 +59,7 @@ class ACAgent(RandomAgent):
 		self.eps = eps
 
 	def get_action(self, state, eps=None, e_greedy=False):
-		action_random = super().get_action(state)
+		action_random = super().get_action(state, eps)
 		return action_random
 
 	def compute_gae(self, last_value, rewards, dones, values, gamma=DISCOUNT_RATE, tau=ADVANTAGE_DECAY):

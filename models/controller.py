@@ -66,7 +66,7 @@ class ControlAgent(RandomAgent):
 	def get_env_action(self, env, state, eps=None):
 		env_action, action = super().get_env_action(env, state, eps)
 		self.world_model.step(self.latent, env_action)
-		return env_action[0], action[0]
+		return env_action, action
 
 	def set_params(self, params):
 		self.controller.set_params(params)
