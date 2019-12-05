@@ -68,7 +68,7 @@ class PPONetwork(PTACNetwork):
 			value = self.critic_local(state.to(self.device))
 			return value
 
-	def optimize(self, states, actions, old_log_probs, targets, advantages, clip_param=0.1):
+	def optimize(self, states, actions, old_log_probs, targets, advantages, clip_param=0.1, e_weight=ENTROPY_WEIGHT):
 		values = self.get_value(states)
 		critic_loss = 0.5*(targets - values).pow(2).mean()
 		self.step(self.critic_optimizer, critic_loss)
@@ -76,7 +76,7 @@ class PPONetwork(PTACNetwork):
 		entropy, new_log_probs = self.get_action_probs(states, actions)
 		ratio = (new_log_probs - old_log_probs).exp()
 		ratio_clipped = torch.clamp(ratio, 1.0-clip_param, 1.0+clip_param)
-		actor_loss = -(torch.min(ratio*advantages, ratio_clipped*advantages).mean() + ENTROPY_WEIGHT*entropy)
+		actor_loss = -(torch.min(ratio*advantages, ratio_clipped*advantages).mean() + e_weight*entropy)
 		self.step(self.actor_optimizer, actor_loss)
 
 	def save_model(self, dirname="pytorch", name="best"):
@@ -94,19 +94,18 @@ class PPOAgent(ACAgent):
 
 	def get_action(self, state, eps=None):
 		state = self.to_tensor(state)
-		self.action = self.network.get_action_probs(state, grad=False)[0].cpu().numpy()
+		self.action, self.log_prob = [x.cpu().numpy() for x in self.network.get_action_probs(state, grad=False)]
 		return np.tanh(self.action)
 
 	def train(self, state, action, next_state, reward, done):
-		self.buffer.append((state, self.action, reward, done))
+		self.buffer.append((state, self.action, self.log_prob, reward, done))
 		if len(self.buffer) == self.update_freq:
-			states, actions, rewards, dones = map(self.to_tensor, zip(*self.buffer))
+			states, actions, log_probs, rewards, dones = map(self.to_tensor, zip(*self.buffer))
 			self.buffer.clear()
 			next_state = self.to_tensor(next_state)
 			values = self.network.get_value(states, grad=False)
 			next_value = self.network.get_value(next_state, grad=False)
 			targets, advantages = self.compute_gae(next_value, rewards.unsqueeze(-1), dones.unsqueeze(-1), values)
-			log_probs = self.network.get_action_probs(states, actions, grad=False)[1]
 			states, actions, log_probs, targets, advantages = [x.view(x.size(0)*x.size(1), *x.size()[2:]) for x in (states, actions, log_probs, targets, advantages)]
 			self.replay_buffer.clear().extend(zip(states, actions, log_probs, targets, advantages))
 			for _ in range(self.ppo_epochs*states.size(0)//self.ppo_batch):

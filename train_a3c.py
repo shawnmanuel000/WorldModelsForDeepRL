@@ -24,7 +24,7 @@ class WorldACAgent(RandomAgent):
 	def __init__(self, action_size, num_envs, acagent, statemodel=WorldModel, load="", gpu=True):
 		super().__init__(action_size)
 		self.world_model = statemodel(action_size, num_envs, load=load, gpu=gpu)
-		self.acagent = acagent(self.world_model.state_size, action_size, load=load, gpu=gpu)
+		self.acagent = acagent(self.world_model.state_size, action_size, load="", gpu=gpu)
 
 	def get_env_action(self, env, state, eps=None):
 		state, latent = self.world_model.get_state(state)
@@ -37,7 +37,7 @@ class WorldACAgent(RandomAgent):
 		self.acagent.train(state, action, next_state, reward, done)
 
 	def reset(self, num_envs):
-		self.world_model.reset(num_envs)
+		self.world_model.reset(num_envs, restore=num_envs>1)
 		return self
 
 	def save_model(self, dirname="pytorch", name="best"):
@@ -60,16 +60,16 @@ def rollout(env, agent, render=False):
 			total_reward += reward
 	return total_reward
 
-def run(model, statemodel, runs=1, load_dir="", ports=16):
+def run(model, statemodel, runs=1, load_dir="", ports=16, restarts=0):
 	model_name = "ppo" if model == PPOAgent else "ddpg" if model == DDPGAgent else "tmp"
 	run_num = len([n for n in os.listdir(f"logs/{model_name}/")])
 	num_envs = len(ports) if type(ports) == list else min(ports, 16)
 	envs = EnvManager(ENV_NAME, ports) if type(ports) == list else EnsembleEnv(ENV_NAME, ports)
 	agent = WorldACAgent(envs.action_size, num_envs, model, statemodel, load=load_dir)
 	total_rewards = deque(maxlen=100)
+	states = envs.reset()
 	for ep in range(runs):
 		agent.reset(num_envs)
-		states = envs.reset()
 		total_reward = 0
 		for _ in range(envs.env.spec.max_episode_steps):
 			env_actions, actions, states = agent.get_env_action(envs.env, states)
@@ -81,10 +81,11 @@ def run(model, statemodel, runs=1, load_dir="", ports=16):
 		total_rewards.append(test_reward)
 		agent.save_model(load_dir, "checkpoint")
 		if total_rewards[-1] >= max(total_rewards): agent.save_model(load_dir)
+		if ep == runs//(restarts+1): agent.acagent.network.init_weights(agent.acagent.network.actor_local)
 		with open(f"logs/{model_name}/logs_{run_num}.txt", "a+") as f:
 			if ep==0: f.write(f"Agent: {model_name}, Model: {statemodel}, State: {agent.world_model.state_size}, Dir: {load_dir}\n")
-			f.write(f"Ep: {ep}, Reward: {total_reward:.4f}, Test: {test_reward:.4f}, Avg: {np.mean(total_rewards):.4f}\n")
-		print(f"Ep: {ep}, Reward: {total_reward:.4f}, Test: {test_reward:.4f}, Avg: {np.mean(total_rewards):.4f}")
+			f.write(f"Ep: {ep}, Reward: {total_reward:.4f}, Test: {test_reward:.4f}, Avg: {np.mean(total_rewards):.4f} ({agent.acagent.eps:.4f})\n")
+		print(f"Ep: {ep}, Reward: {total_reward:.4f}, Test: {test_reward:.4f}, Avg: {np.mean(total_rewards):.4f} ({agent.acagent.eps:.4f})")
 	envs.close()
 
 def trial(model, steps=40000, ports=16):

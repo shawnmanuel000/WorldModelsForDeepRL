@@ -56,6 +56,10 @@ class PTACNetwork():
 		self.critic_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.critic_optimizer, factor=0.5, patience=25, min_lr=1e-5)
 		if load: self.load_model(load)
 
+	def init_weights(self, model=None):
+		model = self if model is None else model
+		model.apply(lambda m: torch.nn.init.xavier_normal_(m.weight) if type(m) in [torch.nn.Conv2d, torch.nn.Linear] else None)
+		
 	def step(self, optimizer, loss, retain=False):
 		optimizer.zero_grad()
 		loss.backward(retain_graph=retain)
@@ -68,7 +72,7 @@ class PTACNetwork():
 	def soft_copy(self, local, target):
 		for t,l in zip(target.parameters(), local.parameters()):
 			t.data.copy_(t.data + self.tau*(l.data - t.data))
-		
+
 	def save_model(self, net="qlearning", dirname="pytorch", name="checkpoint"):
 		filepath = get_checkpoint_path(net, dirname, name)
 		os.makedirs(os.path.dirname(filepath), exist_ok=True)
@@ -77,7 +81,7 @@ class PTACNetwork():
 		
 	def load_model(self, net="qlearning", dirname="pytorch", name="checkpoint"):
 		filepath = get_checkpoint_path(net, dirname, name)
-		if os.path.exists(filepath.replace(".pth", "_a.pth")):
+		if os.path.exists(filepath):
 			self.actor_local.load_state_dict(torch.load(filepath.replace(".pth", "_a.pth")))
 			self.actor_target.load_state_dict(torch.load(filepath.replace(".pth", "_a.pth")))
 			self.critic_local.load_state_dict(torch.load(filepath.replace(".pth", "_c.pth")))

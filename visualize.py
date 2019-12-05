@@ -19,7 +19,7 @@ parser = argparse.ArgumentParser(description='Visualizer')
 parser.add_argument('--iternum', type=int, default=0, help='which port to listen on (as a worker server)')
 args = parser.parse_args()
 
-def evaluate_best(runs=100, gpu=True):
+def evaluate_best(runs=1, gpu=True):
 	env = gym.make("CarRacing-v0")
 	env.env.verbose = 0
 	for iternum in [-1, 0, 1]:
@@ -124,7 +124,6 @@ def visualize_qlearning(gpu=False, save="./tests/qlearning.avi"):
 
 if __name__ == "__main__":
 	dirname = os.path.join(ROOT, f"iter{args.iternum}/")
-	evaluate_best()
 	# visualize_vae(100, dirname)
 	# visualize_mdrnn(200, dirname)
 	# visualize_controller(f"iter{args.iternum}/")

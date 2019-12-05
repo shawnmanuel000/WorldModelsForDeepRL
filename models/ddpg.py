@@ -9,7 +9,7 @@ from utils.network import PTACNetwork, Conv, TARGET_UPDATE_RATE
 LEARN_RATE = 0.0001           # Sets how much we want to update the network weights at each training step
 REPLAY_BATCH_SIZE = 32        # How many experience tuples to sample from the buffer for each train step
 EPS_MIN = 0.1                 # The lower limit proportion of random to greedy actions to take
-EPS_DECAY = 0.995             # The rate at which eps decays from EPS_MAX to EPS_MIN
+EPS_DECAY = 0.990             # The rate at which eps decays from EPS_MAX to EPS_MIN
 INPUT_LAYER = 512
 ACTOR_HIDDEN = 256
 CRITIC_HIDDEN = 1024
@@ -116,4 +116,4 @@ class DDPGAgent(ACAgent):
 			(states, actions, targets, advantages), indices, importance = self.replay_buffer.sample(REPLAY_BATCH_SIZE, dtype=self.to_tensor)
 			errors = self.network.optimize(states, actions, targets, importance**(1-self.eps))
 			self.replay_buffer.update_priorities(indices, errors)
-			if np.any(done): self.eps = max(self.eps * self.decay, EPS_MIN)
+			if done[0]: self.eps = max(self.eps * self.decay, EPS_MIN)

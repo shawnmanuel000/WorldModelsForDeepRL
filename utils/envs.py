@@ -18,12 +18,14 @@ class WorldModel():
 		self.mdrnn = MDRNNCell(load=load, gpu=gpu)
 		self.transform = transforms.Compose([transforms.ToPILImage(), transforms.Resize((IMG_DIM, IMG_DIM)), transforms.ToTensor()])
 		self.state_size = [LATENT_SIZE + HIDDEN_SIZE]
-		self.num_envs = num_envs
+		self.hiddens = {}
 		self.reset(num_envs)
 		if load: self.load_model(load)
 
-	def reset(self, num_envs):
-		self.hidden = self.mdrnn.init_hidden(num_envs)
+	def reset(self, num_envs, restore=True):
+		self.num_envs = num_envs
+		self.hidden = self.hiddens[num_envs] if restore and num_envs in self.hiddens else self.mdrnn.init_hidden(num_envs)
+		self.hiddens[num_envs] = self.hidden
 
 	def get_state(self, state, numpy=True):
 		state = torch.cat([self.transform(s).unsqueeze(0) for s in state]) if self.num_envs > 1 else self.transform(state).unsqueeze(0)
@@ -47,7 +49,7 @@ class ImgStack():
 		self.stack_len = stack_len
 		self.reset(num_envs)
 
-	def reset(self, num_envs):
+	def reset(self, num_envs, restore=False):
 		self.num_envs = num_envs
 		self.stack = deque(maxlen=self.stack_len)
 
@@ -153,6 +155,7 @@ class EnvWorker(Worker):
 			data = pickle.loads(self.conn.recv(20000))
 			if data["cmd"] == "RESET":
 				message = self.env.reset()
+				rewards = 0
 			elif data["cmd"] == "STEP":
 				state, reward, done, info = self.env.step(data["item"])
 				state = self.env.reset() if done else state

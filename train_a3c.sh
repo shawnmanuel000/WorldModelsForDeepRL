@@ -35,10 +35,10 @@ run()
 	open_terminal "python3 train_a3c.py --runs $runs --model $agent --iternum $iterNum --workerports $port_string"
 }
 
+# run 16 500 ddpg -1
 # run 16 500 ddpg 0
 # run 16 500 ddpg 1
-# run 16 500 ppo 0
-# run 16 500 ppo 1
 
-# run 16 500 ddpg -1
-# run 16 500 ppo -1
+run 16 250 ppo -1
+# run 16 250 ppo 0
+# run 16 250 ppo 1

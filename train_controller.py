@@ -52,11 +52,11 @@ def rollout(env, agent, render=False):
 	state = env.reset()
 	total_reward = 0
 	done = False
-	while not done:
-		with torch.no_grad():
+	with torch.no_grad():
+		while not done:
 			if render: env.render()
 			env_action = agent.get_env_action(env, state)[0]
-			state, reward, done, _ = env.step(env_action)
+			state, reward, done, _ = env.step(env_action.reshape(-1))
 			total_reward += reward
 	return total_reward
 
