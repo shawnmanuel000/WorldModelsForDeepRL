@@ -37,7 +37,7 @@ def read_a3c(path="./logs/qlearning/logs_3.txt"):
 	avgs = []
 	with open(path, "r") as f:
 		for line in f:
-			match = re.match("Ep.*Test: (.*), Avg: ([^ ]*)", line.strip('\n'))
+			match = re.match("^Ep.*Test: (.*), Avg: ([^ ]*)", line.strip('\n'))
 			if match:
 				rewards.append(float(match.groups()[0]))
 				avgs.append(float(match.groups()[1]))

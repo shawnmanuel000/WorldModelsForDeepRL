@@ -1,4 +1,4 @@
-Iteration 1
+Agent: ddpg, Model: <class 'utils.envs.WorldModel'>, State: [288], Dir: iter1/
 Ep: 0, Reward: -77.0115, Test: -56.2501, Avg: -56.2501
 Ep: 1, Reward: -48.3059, Test: -56.8776, Avg: -56.5639
 Ep: 2, Reward: -37.4466, Test: -60.4016, Avg: -57.8431

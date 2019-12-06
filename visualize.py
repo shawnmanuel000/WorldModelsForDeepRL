@@ -16,18 +16,18 @@ from data.loaders import ROOT
 from train_a3c import WorldACAgent, rollout
 
 parser = argparse.ArgumentParser(description='Visualizer')
-parser.add_argument('--iternum', type=int, default=0, help='which port to listen on (as a worker server)')
+parser.add_argument('--iternum', type=int, default=-1, help='which port to listen on (as a worker server)')
 args = parser.parse_args()
 
-def evaluate_best(runs=1, gpu=True):
+def evaluate_best(runs=1, gpu=True, iternums=[-1, 0, 1]):
 	env = gym.make("CarRacing-v0")
 	env.env.verbose = 0
-	for iternum in [-1, 0, 1]:
+	for iternum in iternums:
 		dirname = "pytorch" if iternum < 0 else f"iter{iternum}/"
 		for model in [DDPGAgent, PPOAgent]:
 			statemodel = ImgStack if iternum < 0 else WorldModel
 			agent = WorldACAgent(env.action_space.shape, 1, model, statemodel, load=dirname, gpu=gpu, train=False)
-			scores = [rollout(env, agent) for _ in range(runs)]
+			scores = [rollout(env, agent, eps=0.1) for _ in range(runs)]
 			mean = np.mean(scores)
 			std = np.std(scores)
 			print(f"It: {iternum}, Model: {model.__name__}, Mean: {mean}, Std: {std}")
@@ -38,11 +38,11 @@ def evaluate_best(runs=1, gpu=True):
 			scores = [rollout(env, agent) for _ in range(runs)]
 			mean = np.mean(scores)
 			std = np.std(scores)
-			print(f"It {iternum}, Model: Controller, Mean: {mean}, Std: {std}")
+			print(f"It: {iternum}, Model: Controller, Mean: {mean}, Std: {std}")
 			for ep,score in enumerate(scores): print(f"   Ep: {ep}, Score: {score}")
 	env.close()
 
-def visualize_vae(rollout, path="/home/shawn/Documents/world-models/datasets/carracing/openai/", save="./tests/vae.avi"):
+def visualize_vae(rollout, path="/home/shawn/Documents/world-models/datasets/carracing/openai/", save="./tests/videos/vae.avi"):
 	images_file = os.path.join(path, f"rollout_{rollout}.npz")
 	vae = VAE()
 	imgs = []
@@ -55,7 +55,7 @@ def visualize_vae(rollout, path="/home/shawn/Documents/world-models/datasets/car
 			imgs.append(img)
 	make_video(imgs, (2*IMG_DIM, IMG_DIM), save)
 
-def visualize_mdrnn(rollout, path="/home/shawn/Documents/world-models/datasets/carracing/openai/", save="./tests/mdrnn.avi"):
+def visualize_mdrnn(rollout, path="/home/shawn/Documents/world-models/datasets/carracing/openai/", save="./tests/videos/mdrnn.avi"):
 	images_file = os.path.join(path, f"rollout_{rollout}.npz")
 	vae = VAE()
 	mdrnn = MDRNNCell()
@@ -72,7 +72,7 @@ def visualize_mdrnn(rollout, path="/home/shawn/Documents/world-models/datasets/c
 			imgs.append(img)
 	make_video(imgs, (2*IMG_DIM, IMG_DIM), save)
 
-def visualize_controller(load_dir="pytorch", gpu=False, save="./tests/ctrl.avi"):
+def visualize_controller(load_dir="pytorch", gpu=False, save="./tests/videos/ctrl.avi"):
 	env = gym.make("CarRacing-v0")
 	agent = ControlAgent(env.action_space.shape, gpu=False, load=load_dir)
 	img = env.reset()
@@ -86,7 +86,7 @@ def visualize_controller(load_dir="pytorch", gpu=False, save="./tests/ctrl.avi")
 	make_video(imgs, (IMG_DIM, IMG_DIM), save)
 	env.close()
 
-def visualize_dream(load_dir="pytorch", gpu=False, save="./tests/dream.avi"):
+def visualize_dream(load_dir="pytorch", gpu=False, save="./tests/videos/dream.avi"):
 	env = gym.make("CarRacing-v0")
 	agent = ControlAgent(env.action_space.shape, gpu=False, load=load_dir)
 	rec = agent.world_model.vae.sample()[0]
@@ -99,7 +99,7 @@ def visualize_dream(load_dir="pytorch", gpu=False, save="./tests/dream.avi"):
 			imgs.append(rec)
 	make_video(imgs, (IMG_DIM, IMG_DIM), save)
 
-def visualize_qlearning(gpu=False, save="./tests/qlearning.avi"):
+def visualize_qlearning(gpu=False, save="./tests/videos/qlearning.avi"):
 	env = gym.make("CarRacing-v0")
 	vae = VAE()
 	mdrnn = MDRNNCell()
@@ -124,7 +124,7 @@ def visualize_qlearning(gpu=False, save="./tests/qlearning.avi"):
 
 if __name__ == "__main__":
 	dirname = os.path.join(ROOT, f"iter{args.iternum}/")
-	evaluate_best()
+	evaluate_best(100, iternums=[args.iternum])
 	# visualize_vae(100, dirname)
 	# visualize_mdrnn(200, dirname)
 	# visualize_controller(f"iter{args.iternum}/")

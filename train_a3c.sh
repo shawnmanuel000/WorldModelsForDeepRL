@@ -1,5 +1,8 @@
+models=([1]="ddpg" [2]="ppo")
+iternums=([1]="-1" [2]="0" [3]="1")
 
 baseport=$1
+workers=16
 
 open_terminal()
 {
@@ -35,10 +38,9 @@ run()
 	open_terminal "python3 train_a3c.py --runs $runs --model $agent --iternum $iterNum --workerports $port_string"
 }
 
-# run 16 500 ddpg -1
-# run 16 500 ddpg 0
-run 16 500 ddpg 1
+for iter in ${iternums[@]}
+do
+	run $workers 500 ddpg $iter
+	run $workers 250 ppo $iter
+done
 
-# run 16 250 ppo -1
-# run 16 250 ppo 0
-# run 16 250 ppo 1

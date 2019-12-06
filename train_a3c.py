@@ -6,7 +6,7 @@ import numpy as np
 from collections import deque
 from models.ppo import PPOAgent
 from models.ddpg import DDPGAgent
-from models.rand import RandomAgent
+from models.rand import RandomAgent, EPS_MIN
 from utils.envs import EnsembleEnv, EnvManager, EnvWorker, WorldModel, ImgStack
 
 parser = argparse.ArgumentParser(description='PPO Trainer')
@@ -48,14 +48,14 @@ class WorldACAgent(RandomAgent):
 		self.acagent.network.load_model(dirname, name)
 		return self
 
-def rollout(env, agent, render=False):
+def rollout(env, agent, render=False, eps=EPS_MIN):
 	state = env.reset()
 	total_reward = 0
 	done = False
 	with torch.no_grad():
 		while not done:
 			if render: env.render()
-			env_action = agent.get_env_action(env, state, 0.1)[0]
+			env_action = agent.get_env_action(env, state, eps)[0]
 			state, reward, done, _ = env.step(env_action.reshape(-1))
 			total_reward += reward
 	return total_reward
@@ -77,7 +77,8 @@ def run(model, statemodel, runs=1, load_dir="", ports=16, restarts=0):
 			agent.train(states, actions, next_states, rewards, dones)
 			total_reward += np.mean(rewards)
 			states = next_states
-		test_reward = np.mean([rollout(envs.env, agent.reset(1)) for _ in range(5)])
+		rollouts = [rollout(envs.env, agent.reset(1)) for _ in range(max(1, min(10+total_reward//10, 100)))]
+		test_reward = np.mean(rollouts)
 		total_rewards.append(test_reward)
 		agent.save_model(load_dir, "checkpoint")
 		if total_rewards[-1] >= max(total_rewards): agent.save_model(load_dir)

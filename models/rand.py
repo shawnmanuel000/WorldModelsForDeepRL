@@ -25,7 +25,7 @@ class BrownianNoise:
 		self.daction_dt = np.random.randn(1, *self.size)
 
 	def sample(self, state=None, scale=1):
-		batch = len(state) if state is not None and len(state.shape)%2==0 else 1
+		batch = state.shape[0] if state is not None and len(state.shape) in [2,4] else 1
 		self.daction_dt = np.random.randn(batch, *self.size)
 		self.action = self.action[0] if len(self.action) != batch else self.action
 		self.action = np.clip(self.action + math.sqrt(self.dt) * self.daction_dt, -1, 1)
