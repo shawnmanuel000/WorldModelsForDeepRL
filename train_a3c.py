@@ -14,7 +14,7 @@ parser.add_argument('--workerports', type=int, default=[16], nargs="+", help='ho
 parser.add_argument('--selfport', type=int, default=None, help='which port to listen on (as a worker server)')
 parser.add_argument('--iternum', type=int, default=-1, help='whether to load last saved model')
 parser.add_argument('--runs', type=int, default=1, help='how many times to run the simulation')
-parser.add_argument('--model', type=str, default="ppo", help='whether to load last saved model')
+parser.add_argument('--model', type=str, default="ddpg", help='whether to load last saved model')
 parser.add_argument('--trial', action="store_true", help='whether to use image observations')
 args = parser.parse_args()
 
