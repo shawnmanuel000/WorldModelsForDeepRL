@@ -1,8 +1,10 @@
 import os
+import re
 import gym
 import cv2
 import torch
 import random
+import inspect
 import numpy as np
 import matplotlib.pyplot as plt
 from models.vae import VAE
@@ -53,3 +55,30 @@ def from_env(env, env_action):
 	action_normal = np.divide(env_action - env.action_space.low, action_range)
 	action = 2*action_normal - 1
 	return action
+
+class Logger():
+	def __init__(self, model_class, load_dir, **kwconfig):
+		self.config = kwconfig
+		self.load_dir = load_dir
+		self.model_class = model_class
+		self.model_name = inspect.getmodule(model_class).__name__.split(".")[-1]
+		os.makedirs(f"logs/{self.model_name}/{load_dir}/", exist_ok=True)
+		self.run_num = len([n for n in os.listdir(f"logs/{self.model_name}/{load_dir}/")])
+		self.model_src = [line for line in open(inspect.getabsfile(self.model_class))]
+		self.net_src = [line for line in open(f"utils/network.py") if re.match("^[A-Z]", line)] if self.model_name in ["ddpg", "ppo"] else []
+		self.log_path = f"logs/{self.model_name}/{load_dir}/logs_{self.run_num}.txt"
+		self.log_num = 0
+
+	def log(self, string, debug=True):
+		with open(self.log_path, "a+") as f:
+			if self.log_num == 0: 
+				f.write(f"Model: {self.model_class}, Dir: {self.load_dir}\n")
+				f.writelines(" ".join([f"{k}: {v}," for k,v in self.config.items()]) + "\n\n")
+				f.writelines(self.model_src + ["\n"])
+				f.writelines(self.net_src + ["\n"])
+			f.write(f"{string}\n")
+		if debug: print(string)
+		self.log_num += 1
+
+	def get_classes(self, model):
+		return [v for k,v in model.__dict__.items() if inspect.getmembers(v)[0][0] == "__class__"]

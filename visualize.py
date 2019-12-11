@@ -8,7 +8,7 @@ from torchvision import transforms
 from models.vae import VAE, LATENT_SIZE
 from models.mdrnn import MDRNNCell, HIDDEN_SIZE
 from models.controller import ControlAgent
-from models.ddpg import DDPGAgent
+from models.ddpg import DDPGAgent, EPS_MIN
 from models.ppo import PPOAgent
 from utils.misc import IMG_DIM, resize, make_video
 from utils.envs import ImgStack, WorldModel
@@ -27,19 +27,22 @@ def evaluate_best(runs=1, gpu=True, iternums=[-1, 0, 1]):
 		for model in [DDPGAgent, PPOAgent]:
 			statemodel = ImgStack if iternum < 0 else WorldModel
 			agent = WorldACAgent(env.action_space.shape, 1, model, statemodel, load=dirname, gpu=gpu, train=False)
-			scores = [rollout(env, agent, eps=0.1) for _ in range(runs)]
+			scores = [rollout(env, agent, eps=EPS_MIN) for _ in range(runs)]
+			# scores = []
+			# for ep in range(runs):
+			# 	scores.append(rollout(env, agent, eps=EPS_MIN, render=True))
+			# 	print(f"   Ep: {ep}, Score: {scores[-1]}")
 			mean = np.mean(scores)
 			std = np.std(scores)
 			print(f"It: {iternum}, Model: {model.__name__}, Mean: {mean}, Std: {std}")
 			for ep,score in enumerate(scores): print(f"   Ep: {ep}, Score: {score}")
 
-		if iternum >= 0:
-			agent = ControlAgent(env.action_space.shape, load=dirname, gpu=gpu)
-			scores = [rollout(env, agent) for _ in range(runs)]
-			mean = np.mean(scores)
-			std = np.std(scores)
-			print(f"It: {iternum}, Model: Controller, Mean: {mean}, Std: {std}")
-			for ep,score in enumerate(scores): print(f"   Ep: {ep}, Score: {score}")
+		agent = ControlAgent(env.action_space.shape, load=dirname, gpu=False)
+		scores = [rollout(env, agent) for _ in range(runs)]
+		mean = np.mean(scores)
+		std = np.std(scores)
+		print(f"It: {iternum}, Model: Controller, Mean: {mean}, Std: {std}")
+		for ep,score in enumerate(scores): print(f"   Ep: {ep}, Score: {score}")
 	env.close()
 
 def visualize_vae(rollout, path="/home/shawn/Documents/world-models/datasets/carracing/openai/", save="./tests/videos/vae.avi"):

@@ -22,7 +22,7 @@ class WorldModel():
 		self.reset(num_envs)
 		if load: self.load_model(load)
 
-	def reset(self, num_envs, restore=True):
+	def reset(self, num_envs, restore=False):
 		self.num_envs = num_envs
 		self.hidden = self.hiddens[num_envs] if restore and num_envs in self.hiddens else self.mdrnn.init_hidden(num_envs)
 		self.hiddens[num_envs] = self.hidden

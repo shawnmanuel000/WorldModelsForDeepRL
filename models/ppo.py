@@ -3,21 +3,19 @@ import torch
 import pickle
 import argparse
 import numpy as np
-from models.rand import ReplayBuffer, ACAgent
-from utils.network import PTACNetwork, Conv
+from models.rand import ReplayBuffer, PrioritizedReplayBuffer
+from utils.network import PTACNetwork, PTACAgent, Conv, INPUT_LAYER, ACTOR_HIDDEN, CRITIC_HIDDEN
 
 LEARN_RATE = 0.0001
+EPS_MIN = 0.2                 # The lower limit proportion of random to greedy actions to take
+EPS_DECAY = 0.995             # The rate at which eps decays from EPS_MAX to EPS_MIN
 BATCH_SIZE = 5
 PPO_EPOCHS = 4
-EPS_MIN = 0.1                 # The lower limit proportion of random to greedy actions to take
-EPS_DECAY = 0.995             # The rate at which eps decays from EPS_MAX to EPS_MIN
-ENTROPY_WEIGHT = 0.005
-INPUT_LAYER = 512
-ACTOR_HIDDEN = 256
-CRITIC_HIDDEN = 1024
+ENTROPY_WEIGHT = 0.01
+CLIP_PARAM = 0.2
 
 class PPOActor(torch.nn.Module):
-	def __init__(self, state_size, action_size, sig=0.0):
+	def __init__(self, state_size, action_size):
 		super().__init__()
 		self.layer1 = torch.nn.Linear(state_size[-1], INPUT_LAYER) if len(state_size)==1 else Conv(state_size, INPUT_LAYER)
 		self.layer2 = torch.nn.Linear(INPUT_LAYER, ACTOR_HIDDEN)
@@ -26,14 +24,14 @@ class PPOActor(torch.nn.Module):
 		self.action_sig = torch.nn.Parameter(torch.zeros(*action_size))
 		self.apply(lambda m: torch.nn.init.xavier_normal_(m.weight) if type(m) in [torch.nn.Conv2d, torch.nn.Linear] else None)
 		
-	def forward(self, state, action=None):
+	def forward(self, state, action=None, sample=True):
 		state = self.layer1(state).relu()
 		state = self.layer2(state).relu()
 		state = self.layer3(state).relu()
 		action_mu = self.action_mu(state)
 		action_sig = self.action_sig.exp().expand_as(action_mu)
 		dist = torch.distributions.Normal(action_mu, action_sig)
-		action = dist.sample() if action is None else action
+		action = action_mu if not sample else dist.sample() if action is None else action
 		log_prob = dist.log_prob(action)
 		entropy = dist.entropy()
 		return action, log_prob, entropy
@@ -58,9 +56,9 @@ class PPONetwork(PTACNetwork):
 	def __init__(self, state_size, action_size, lr=LEARN_RATE, gpu=True, load=None):
 		super().__init__(state_size, action_size, PPOActor, PPOCritic, lr=lr, gpu=gpu, load=load)
 
-	def get_action_probs(self, state, action_in=None, grad=True):
+	def get_action_probs(self, state, action_in=None, sample=True, grad=True):
 		with torch.enable_grad() if grad else torch.no_grad():
-			action, log_prob, entropy = self.actor_local(state.to(self.device), action_in)
+			action, log_prob, entropy = self.actor_local(state.to(self.device), action_in, sample)
 			return action if action_in is None else entropy.mean(), log_prob
 
 	def get_value(self, state, grad=True):
@@ -68,16 +66,18 @@ class PPONetwork(PTACNetwork):
 			value = self.critic_local(state.to(self.device))
 			return value
 
-	def optimize(self, states, actions, old_log_probs, targets, advantages, clip_param=0.1, e_weight=ENTROPY_WEIGHT):
+	def optimize(self, states, actions, old_log_probs, targets, advantages, importances=1, clip_param=CLIP_PARAM, e_weight=ENTROPY_WEIGHT):
 		values = self.get_value(states)
-		critic_loss = 0.5*(targets - values).pow(2).mean()
-		self.step(self.critic_optimizer, critic_loss)
+		critic_error = values - targets
+		critic_loss = importances.to(self.device) + critic_error.pow(2)
+		self.step(self.critic_optimizer, critic_loss.mean())
 
 		entropy, new_log_probs = self.get_action_probs(states, actions)
 		ratio = (new_log_probs - old_log_probs).exp()
 		ratio_clipped = torch.clamp(ratio, 1.0-clip_param, 1.0+clip_param)
 		actor_loss = -(torch.min(ratio*advantages, ratio_clipped*advantages).mean() + e_weight*entropy)
 		self.step(self.actor_optimizer, actor_loss)
+		return critic_error.cpu().detach().numpy().squeeze(-1)
 
 	def save_model(self, dirname="pytorch", name="best"):
 		super().save_model("ppo", dirname, name)
@@ -85,16 +85,16 @@ class PPONetwork(PTACNetwork):
 	def load_model(self, dirname="pytorch", name="best"):
 		super().load_model("ppo", dirname, name)
 
-class PPOAgent(ACAgent):
-	def __init__(self, state_size, action_size, decay=EPS_DECAY, gpu=True, load=None):
-		super().__init__(state_size, action_size, decay=decay, gpu=gpu, load=load)
-		self.network = PPONetwork(state_size, action_size, gpu=gpu, load=load)
+class PPOAgent(PTACAgent):
+	def __init__(self, state_size, action_size, decay=EPS_DECAY, lr=LEARN_RATE, gpu=True, load=None):
+		super().__init__(state_size, action_size, PPONetwork, lr=lr, decay=decay, gpu=gpu, load=load)
+		self.replay_buffer = PrioritizedReplayBuffer()
 		self.ppo_epochs = PPO_EPOCHS
 		self.ppo_batch = BATCH_SIZE
 
-	def get_action(self, state, eps=None):
+	def get_action(self, state, eps=None, sample=True):
 		state = self.to_tensor(state)
-		self.action, self.log_prob = [x.cpu().numpy() for x in self.network.get_action_probs(state, grad=False)]
+		self.action, self.log_prob = [x.cpu().numpy() for x in self.network.get_action_probs(state, sample=sample, grad=False)]
 		return np.tanh(self.action)
 
 	def train(self, state, action, next_state, reward, done):
@@ -109,6 +109,7 @@ class PPOAgent(ACAgent):
 			states, actions, log_probs, targets, advantages = [x.view(x.size(0)*x.size(1), *x.size()[2:]) for x in (states, actions, log_probs, targets, advantages)]
 			self.replay_buffer.clear().extend(zip(states, actions, log_probs, targets, advantages))
 			for _ in range(self.ppo_epochs*states.size(0)//self.ppo_batch):
-				states, actions, log_probs, targets, advantages = self.replay_buffer.sample(self.ppo_batch, dtype=torch.stack)[0]
-				self.network.optimize(states, actions, log_probs, targets, advantages, clip_param=0.1*self.eps)
-			self.eps = max(self.eps * self.decay, EPS_MIN)
+				(states, actions, log_probs, targets, advantages), indices, importances = self.replay_buffer.sample(self.ppo_batch, dtype=torch.stack)
+				errors = self.network.optimize(states, actions, log_probs, targets, advantages, importances**(1-self.eps), CLIP_PARAM*self.eps)
+				self.replay_buffer.update_priorities(indices, errors)
+		if done[0]: self.eps = max(self.eps * self.decay, EPS_MIN)

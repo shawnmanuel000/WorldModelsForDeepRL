@@ -4,15 +4,6 @@ import random
 import numpy as np
 from collections import deque
 from operator import itemgetter
-from utils.network import PTACNetwork, PTActor, PTCritic
-
-DISCOUNT_RATE = 0.97
-NUM_STEPS = 20
-EPS_MAX = 1.0                 # The starting proportion of random to greedy actions to take
-EPS_MIN = 0.1                 # The lower limit proportion of random to greedy actions to take
-EPS_DECAY = 0.995             # The rate at which eps decays from EPS_MAX to EPS_MIN
-ADVANTAGE_DECAY = 0.95
-MAX_BUFFER_SIZE = 100000       # Sets the maximum length of the replay buffer
 
 class BrownianNoise:
 	def __init__(self, size, dt=0.02):
@@ -35,12 +26,12 @@ class RandomAgent():
 	def __init__(self, action_size):
 		self.noise_process = BrownianNoise(action_size)
 
-	def get_action(self, state, eps=None):
+	def get_action(self, state, eps=None, sample=True):
 		action = self.noise_process.sample(state)
 		return action
 
-	def get_env_action(self, env, state=None, eps=None):
-		action = self.get_action(state, eps)
+	def get_env_action(self, env, state=None, eps=None, sample=True):
+		action = self.get_action(state, eps, sample)
 		action_normal = (1+action)/2
 		action_range = env.action_space.high - env.action_space.low
 		env_action = env.action_space.low + np.multiply(action_normal, action_range)
@@ -48,36 +39,6 @@ class RandomAgent():
 
 	def train(self, state, action, next_state, reward, done):
 		if done: self.noise_process.reset()
-
-class ACAgent(RandomAgent):
-	def __init__(self, state_size, action_size, update_freq=NUM_STEPS, eps=EPS_MAX, decay=EPS_DECAY, gpu=True, load=None):
-		super().__init__(action_size)
-		self.network = PTACNetwork(state_size, action_size, PTActor, PTCritic, gpu=gpu, load=load)
-		self.to_tensor = lambda x: torch.from_numpy(np.array(x)).float().to(self.network.device)
-		self.replay_buffer = ReplayBuffer(MAX_BUFFER_SIZE)
-		self.update_freq = update_freq
-		self.buffer = []
-		self.decay = decay
-		self.eps = eps
-
-	def get_action(self, state, eps=None, e_greedy=False):
-		action_random = super().get_action(state, eps)
-		return action_random
-
-	def compute_gae(self, last_value, rewards, dones, values, gamma=DISCOUNT_RATE, tau=ADVANTAGE_DECAY):
-		with torch.no_grad():
-			gae = 0
-			targets = torch.zeros_like(values, device=values.device)
-			values = torch.cat([values, last_value.unsqueeze(0)])
-			for step in reversed(range(len(rewards))):
-				delta = rewards[step] + gamma * values[step + 1] * (1-dones[step]) - values[step]
-				gae = delta + gamma * tau * (1-dones[step]) * gae
-				targets[step] = gae + values[step]
-			advantages = targets - values[:-1]
-			return targets, advantages
-		
-	def train(self, state, action, next_state, reward, done):
-		pass
 
 class ReplayBuffer():
 	def __init__(self, maxlen=None):
@@ -101,7 +62,7 @@ class ReplayBuffer():
 		sample_indices = random.choices(range(len(self.buffer)), k=sample_size, weights=weights)
 		samples = itemgetter(*sample_indices)(self.buffer)
 		sample_arrays = samples if dtype is None else map(dtype, zip(*samples))
-		return sample_arrays, sample_indices, 1
+		return sample_arrays, sample_indices, torch.Tensor([1])
 
 	def update_priorities(self, indices, errors, offset=0.1):
 		pass
@@ -132,13 +93,13 @@ class PrioritizedReplayBuffer(ReplayBuffer):
 	def get_importance(self, probabilities):
 		importance = 1/len(self.buffer) * 1/probabilities
 		importance_normalized = importance / max(importance)
-		return importance_normalized
+		return importance_normalized[:,np.newaxis]
 		
-	def sample(self, batch_size, dtype=np.array, priority_scale=0.6):
+	def sample(self, batch_size, dtype=np.array, priority_scale=0.5):
 		sample_probs = self.get_probabilities(priority_scale)
 		samples, sample_indices, _ = super().sample(batch_size, None, sample_probs)
 		importance = self.get_importance(sample_probs[sample_indices])
-		return map(dtype, zip(*samples)), sample_indices, dtype(importance)
+		return map(dtype, zip(*samples)), sample_indices, torch.Tensor(importance)
 						
 	def update_priorities(self, indices, errors, offset=0.1):
 		for i,e in zip(indices, errors):

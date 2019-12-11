@@ -1,8 +1,9 @@
 models=([1]="ddpg" [2]="ppo")
-iternums=([1]="-1" [2]="0" [3]="1")
+iternums=([1]="1") # [2]="0" [3]="-1")
 
 baseport=$1
 workers=16
+model=$2
 
 open_terminal()
 {
@@ -12,7 +13,7 @@ open_terminal()
 		tell app "Terminal" to do script "cd \"`pwd`\"; $script; exit"
 END
 	elif [[ "$OSTYPE" == "linux-gnu" ]]; then # Running on linux
-		xterm -e $script $2
+		xterm -display ":0" -e $script $2 # Add -hold argument after xterm to debug
 	fi
 }
 
@@ -30,17 +31,21 @@ run()
 	do
 		port=$(($baseport+$j))
 		ports+=($port)
-		open_terminal "python3 train_a3c.py --selfport $port --iternum $iterNum" &
+		open_terminal "python3 -B train_a3c.py --selfport $port --iternum $iterNum" &
 	done
 
 	sleep 4
 	port_string=$( IFS=$' '; echo "${ports[*]}" )
-	open_terminal "python3 train_a3c.py --runs $runs --model $agent --iternum $iterNum --workerports $port_string"
+	open_terminal "python3 -B train_a3c.py --runs $runs --model $agent --iternum $iterNum --workerports $port_string"
 }
 
 for iter in ${iternums[@]}
 do
-	run $workers 500 ddpg $iter
-	run $workers 250 ppo $iter
+	runs=250
+	if [ $model = "ddpg" ]
+	then
+		runs=500
+	fi 
+	run $workers $runs $model $iter
 done
 

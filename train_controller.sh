@@ -12,7 +12,7 @@ open_terminal()
 		tell app "Terminal" to do script "cd \"`pwd`\"; $script; exit"
 END
 	elif [[ "$OSTYPE" == "linux-gnu" ]]; then # Running on linux
-		xterm -e $script $2
+		DISPLAY=:0 xterm -e $script $2
 	fi
 }
 
@@ -23,12 +23,12 @@ run()
 	do
 		port=$((4000+$j))
 		ports+=($port)
-		open_terminal "python3 train_controller.py --selfport $port --iternum $iterNum" &
+		open_terminal "python3 -B train_controller.py --selfport $port --iternum $iterNum" &
 	done
 
 	sleep $numWorkers
 	port_string=$( IFS=$' '; echo "${ports[*]}" )
-	open_terminal "python3 train_controller.py --workerports $port_string --iternum $iterNum"
+	open_terminal "python3 -B train_controller.py --workerports $port_string --iternum $iterNum"
 }
 
 run

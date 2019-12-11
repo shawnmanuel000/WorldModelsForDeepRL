@@ -5,9 +5,10 @@ import argparse
 import numpy as np
 from collections import deque
 from models.ppo import PPOAgent
-from models.ddpg import DDPGAgent
-from models.rand import RandomAgent, EPS_MIN
+from models.rand import RandomAgent
+from models.ddpg import DDPGAgent, EPS_MIN
 from utils.envs import EnsembleEnv, EnvManager, EnvWorker, WorldModel, ImgStack
+from utils.misc import Logger
 
 parser = argparse.ArgumentParser(description='PPO Trainer')
 parser.add_argument('--workerports', type=int, default=[16], nargs="+", help='how many worker servers to connect to')
@@ -26,9 +27,9 @@ class WorldACAgent(RandomAgent):
 		self.world_model = statemodel(action_size, num_envs, load=load, gpu=gpu)
 		self.acagent = acagent(self.world_model.state_size, action_size, load="" if train else load, gpu=gpu)
 
-	def get_env_action(self, env, state, eps=None):
+	def get_env_action(self, env, state, eps=None, sample=True):
 		state, latent = self.world_model.get_state(state)
-		env_action, action = self.acagent.get_env_action(env, state, eps)
+		env_action, action = self.acagent.get_env_action(env, state, eps, sample)
 		self.world_model.step(latent, env_action)
 		return env_action, action, state
 
@@ -48,26 +49,25 @@ class WorldACAgent(RandomAgent):
 		self.acagent.network.load_model(dirname, name)
 		return self
 
-def rollout(env, agent, render=False, eps=EPS_MIN):
+def rollout(env, agent, eps=None, render=False, sample=False):
 	state = env.reset()
 	total_reward = 0
 	done = False
 	with torch.no_grad():
 		while not done:
 			if render: env.render()
-			env_action = agent.get_env_action(env, state, eps)[0]
+			env_action = agent.get_env_action(env, state, eps, sample)[0]
 			state, reward, done, _ = env.step(env_action.reshape(-1))
 			total_reward += reward
 	return total_reward
 
-def run(model, statemodel, runs=1, load_dir="", ports=16, restarts=0):
-	model_name = "ppo" if model == PPOAgent else "ddpg" if model == DDPGAgent else "tmp"
-	run_num = len([n for n in os.listdir(f"logs/{model_name}/")])
+def run(model, statemodel, runs=1, load_dir="", ports=16):
+	logger = Logger(model, load_dir)
 	num_envs = len(ports) if type(ports) == list else min(ports, 16)
 	envs = EnvManager(ENV_NAME, ports) if type(ports) == list else EnsembleEnv(ENV_NAME, ports)
 	agent = WorldACAgent(envs.action_size, num_envs, model, statemodel, load=load_dir)
-	total_rewards = deque(maxlen=100)
 	states = envs.reset()
+	total_rewards = []
 	for ep in range(runs):
 		agent.reset(num_envs)
 		total_reward = 0
@@ -77,16 +77,12 @@ def run(model, statemodel, runs=1, load_dir="", ports=16, restarts=0):
 			agent.train(states, actions, next_states, rewards, dones)
 			total_reward += np.mean(rewards)
 			states = next_states
-		rollouts = [rollout(envs.env, agent.reset(1)) for _ in range(max(1, min(10+total_reward//10, 100)))]
-		test_reward = np.mean(rollouts)
+		rollouts = [rollout(envs.env, agent.reset(1)) for _ in range(10)]
+		test_reward = np.mean(rollouts) - np.std(rollouts)
 		total_rewards.append(test_reward)
 		agent.save_model(load_dir, "checkpoint")
 		if total_rewards[-1] >= max(total_rewards): agent.save_model(load_dir)
-		if ep == runs//(restarts+1): agent.acagent.network.init_weights(agent.acagent.network.actor_local)
-		with open(f"logs/{model_name}/logs_{run_num}.txt", "a+") as f:
-			if ep==0: f.write(f"Agent: {model_name}, Model: {statemodel}, State: {agent.world_model.state_size}, Dir: {load_dir}\n")
-			f.write(f"Ep: {ep}, Reward: {total_reward:.4f}, Test: {test_reward:.4f}, Avg: {np.mean(total_rewards):.4f} ({agent.acagent.eps:.4f})\n")
-		print(f"Ep: {ep}, Reward: {total_reward:.4f}, Test: {test_reward:.4f}, Avg: {np.mean(total_rewards):.4f} ({agent.acagent.eps:.4f})")
+		logger.log(f"Ep: {ep}, Reward: {total_reward:.4f}, Test: {test_reward+np.std(rollouts):.4f} [{np.std(rollouts):.2f}], Avg: {np.mean(total_rewards):.4f} ({agent.acagent.eps:.3f})")
 	envs.close()
 
 def trial(model, steps=40000, ports=16):
