@@ -81,4 +81,4 @@ class ControlAgent(RandomAgent):
 		return self
 
 def get_checkpoint_path(dirname="pytorch", name="best"):
-	return f"./saved_models/ctrl/{dirname}/{name}.pth"
+	return f"./saved_models/controller/{dirname}/{name}.pth"
