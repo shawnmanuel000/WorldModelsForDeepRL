@@ -123,7 +123,7 @@ class MDRNNCell(torch.nn.Module):
 	def load_model(self, dirname="pytorch", name="best"):
 		filepath = get_checkpoint_path(dirname, name)
 		if os.path.exists(filepath):
-			self.load_state_dict({k.replace("_l0",""):v for k,v in torch.load(filepath).items()})
+			self.load_state_dict({k.replace("_l0",""):v for k,v in torch.load(filepath, map_location=self.device).items()})
 		return self
 
 def get_checkpoint_path(dirname="pytorch", name="best"):

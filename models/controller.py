@@ -49,7 +49,7 @@ class Controller():
 	def load_model(self, dirname="pytorch", name="best"):
 		filepath = get_checkpoint_path(dirname, name)
 		if os.path.exists(filepath):
-			self.actor_local.load_state_dict(torch.load(filepath))
+			self.actor_local.load_state_dict(torch.load(filepath, map_location=self.device))
 		return self
 
 class ControlAgent(RandomAgent):

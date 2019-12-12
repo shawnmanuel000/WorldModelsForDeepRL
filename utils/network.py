@@ -91,13 +91,13 @@ class PTACNetwork():
 	def load_model(self, net="qlearning", dirname="pytorch", name="checkpoint"):
 		filepath = get_checkpoint_path(net, dirname, name)
 		if os.path.exists(filepath.replace(".pth", "_a.pth")):
-			self.actor_local.load_state_dict(torch.load(filepath.replace(".pth", "_a.pth")))
-			self.actor_target.load_state_dict(torch.load(filepath.replace(".pth", "_a.pth")))
-			self.critic_local.load_state_dict(torch.load(filepath.replace(".pth", "_c.pth")))
-			self.critic_target.load_state_dict(torch.load(filepath.replace(".pth", "_c.pth")))
+			self.actor_local.load_state_dict(torch.load(filepath.replace(".pth", "_a.pth"), map_location=self.device))
+			self.actor_target.load_state_dict(torch.load(filepath.replace(".pth", "_a.pth"), map_location=self.device))
+			self.critic_local.load_state_dict(torch.load(filepath.replace(".pth", "_c.pth"), map_location=self.device))
+			self.critic_target.load_state_dict(torch.load(filepath.replace(".pth", "_c.pth"), map_location=self.device))
 
 class PTACAgent(RandomAgent):
-	def __init__(self, state_size, action_size, network, lr=LEARN_RATE, update_freq=NUM_STEPS, eps=EPS_MAX, decay=EPS_DECAY, gpu=True, load=None):
+	def __init__(self, state_size, action_size, network=PTACNetwork, lr=LEARN_RATE, update_freq=NUM_STEPS, eps=EPS_MAX, decay=EPS_DECAY, gpu=True, load=None):
 		super().__init__(action_size)
 		self.network = network(state_size, action_size, lr=lr, gpu=gpu, load=load)
 		self.to_tensor = lambda x: torch.from_numpy(np.array(x)).float().to(self.network.device)

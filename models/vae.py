@@ -114,9 +114,9 @@ class VAE(torch.nn.Module):
 	def load_model(self, dirname="pytorch", name="best"):
 		filepath = get_checkpoint_path(dirname, name)
 		if os.path.exists(filepath.replace(".pth", "_e.pth")):
-			self.encoder.load_state_dict(torch.load(filepath.replace(".pth", "_e.pth")))
+			self.encoder.load_state_dict(torch.load(filepath.replace(".pth", "_e.pth"), map_location=self.device))
 		if os.path.exists(filepath.replace(".pth", "_d.pth")):
-			self.decoder.load_state_dict(torch.load(filepath.replace(".pth", "_d.pth")))
+			self.decoder.load_state_dict(torch.load(filepath.replace(".pth", "_d.pth"), map_location=self.device))
 		return self
 
 def get_checkpoint_path(dirname="pytorch", name="best"):
