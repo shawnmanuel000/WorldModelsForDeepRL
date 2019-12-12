@@ -49,7 +49,6 @@ def read_a3c(path):
 	return rewards, rolling
 
 def graph_ctrl():
-	# _, ravgs = read_a3c("./logs/qlearning/random.txt")
 	bests, rolling = zip(*[read_ctrl(f"./logs/controller/{path}") for path in ctrls])
 	plt.plot(range(len(bests[-1])), bests[-1], color="#ADFF2F", linewidth=0.5, label="Best of Baseline")
 	plt.plot(range(len(bests[0])), bests[0], color="#00BFFF", linewidth=0.5, label="Best of Iteration 1")
@@ -57,7 +56,6 @@ def graph_ctrl():
 	plt.plot(range(len(rolling[-1])), rolling[-1], color="#008000", label="Avg of Baseline")
 	plt.plot(range(len(rolling[0])), rolling[0], color="#0000CD", label="Avg of Iteration 1")
 	plt.plot(range(len(rolling[1])), rolling[1], color="#FF0000", label="Avg of Iteration 2")
-	# plt.plot(range(len(ravgs[:len(rolling[0])])), ravgs[:len(rolling[0])], color="#FF0000", label="Avg Random")
 	print(f"Max-1: {max(bests[-1]):.0f}, Max0: {max(bests[0]):.0f}, Max1: {max(bests[1]):.0f}")
 	print(f"Avg-1: {max(rolling[-1]):.0f}, Avg0: {max(rolling[0]):.0f}, Avg1: {max(rolling[1]):.0f}")
 	
@@ -85,7 +83,6 @@ def graph_a3c(model="ddpg", logs=ddpgs):
 	plt.xlabel("Rollout")
 	plt.ylabel("Total Score")
 	plt.grid(linewidth=0.3, linestyle='-')
-
 
 def main():
 	graph_ctrl()
