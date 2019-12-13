@@ -1,9 +1,9 @@
 models=([1]="ddpg" [2]="ppo")
 iternums=([1]="1") # [2]="0" [3]="-1")
 
-baseport=$1
+model=$1
 workers=16
-model=$2
+baseport=$2
 
 open_terminal()
 {
