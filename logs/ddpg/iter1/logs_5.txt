@@ -1,0 +1,166 @@
+Model: <class 'models.ddpg.DDPGAgent'>, Dir: iter1/
+
+
+import os
+import math
+import torch
+import random
+import numpy as np
+from models.rand import RandomAgent, PrioritizedReplayBuffer, ReplayBuffer
+from utils.network import PTACNetwork, PTACAgent, Conv, INPUT_LAYER, ACTOR_HIDDEN, CRITIC_HIDDEN, LEARN_RATE
+
+EPS_MIN = 0.01                # The lower limit proportion of random to greedy actions to take
+EPS_DECAY = 0.980             # The rate at which eps decays from EPS_MAX to EPS_MIN
+REPLAY_BATCH_SIZE = 32        # How many experience tuples to sample from the buffer for each train step
+
+class DDPGActor(torch.nn.Module):
+	def __init__(self, state_size, action_size):
+		super().__init__()
+		self.layer1 = torch.nn.Linear(state_size[-1], INPUT_LAYER) if len(state_size)==1 else Conv(state_size, INPUT_LAYER)
+		self.layer2 = torch.nn.Linear(INPUT_LAYER, ACTOR_HIDDEN)
+		self.layer3 = torch.nn.Linear(ACTOR_HIDDEN, ACTOR_HIDDEN)
+		self.action_mu = torch.nn.Linear(ACTOR_HIDDEN, *action_size)
+		self.action_sig = torch.nn.Linear(ACTOR_HIDDEN, *action_size)
+		self.apply(lambda m: torch.nn.init.xavier_normal_(m.weight) if type(m) in [torch.nn.Conv2d, torch.nn.Linear] else None)
+
+	def forward(self, state, sample=True):
+		state = self.layer1(state).relu() 
+		state = self.layer2(state).relu() 
+		state = self.layer3(state).relu() 
+		action_mu = self.action_mu(state)
+		action_sig = self.action_sig(state).exp()
+		epsilon = torch.randn_like(action_sig)
+		action = action_mu + epsilon.mul(action_sig) if sample else action_mu
+		return action.tanh()
+	
+class DDPGCritic(torch.nn.Module):
+	def __init__(self, state_size, action_size):
+		super().__init__()
+		self.net_state = torch.nn.Linear(state_size[-1], INPUT_LAYER) if len(state_size)==1 else Conv(state_size, INPUT_LAYER)
+		self.net_action = torch.nn.Linear(*action_size, INPUT_LAYER)
+		self.net_layer1 = torch.nn.Linear(2*INPUT_LAYER, CRITIC_HIDDEN)
+		self.net_layer2 = torch.nn.Linear(CRITIC_HIDDEN, CRITIC_HIDDEN)
+		self.q_value = torch.nn.Linear(CRITIC_HIDDEN, 1)
+		self.apply(lambda m: torch.nn.init.xavier_normal_(m.weight) if type(m) in [torch.nn.Conv2d, torch.nn.Linear] else None)
+
+	def forward(self, state, action):
+		state = self.net_state(state).relu()
+		net_action = self.net_action(action).relu()
+		net_layer = torch.cat([state, net_action], dim=-1)
+		net_layer = self.net_layer1(net_layer).relu()
+		net_layer = self.net_layer2(net_layer).relu()
+		q_value = self.q_value(net_layer)
+		return q_value
+
+class DDPGNetwork(PTACNetwork):
+	def __init__(self, state_size, action_size, lr=LEARN_RATE, gpu=True, load=None): 
+		super().__init__(state_size, action_size, DDPGActor, DDPGCritic, lr=lr, gpu=gpu, load=load)
+
+	def get_action(self, state, use_target=False, numpy=True, sample=True):
+		with torch.no_grad():
+			actor = self.actor_local if not use_target else self.actor_target
+			return actor(state, sample).cpu().numpy() if numpy else actor(state, sample)
+
+	def get_q_value(self, state, action, use_target=False, numpy=True):
+		with torch.no_grad():
+			critic = self.critic_local if not use_target else self.critic_target
+			return critic(state, action).cpu().numpy() if numpy else critic(state, action)
+	
+	def optimize(self, states, actions, q_targets, importances=1):
+		q_values = self.critic_local(states, actions)
+		critic_error = q_values - q_targets.detach()
+		critic_loss = importances.to(self.device) * critic_error.pow(2)
+		self.step(self.critic_optimizer, critic_loss.mean())
+
+		q_actions = self.critic_local(states, self.actor_local(states))
+		actor_loss = -(q_actions - q_values.detach())
+		self.step(self.actor_optimizer, actor_loss.mean())
+		
+		self.soft_copy(self.actor_local, self.actor_target)
+		self.soft_copy(self.critic_local, self.critic_target)
+		return critic_error.cpu().detach().numpy().squeeze(-1)
+	
+	def save_model(self, dirname="pytorch", name="best"):
+		super().save_model("ddpg", dirname, name)
+		
+	def load_model(self, dirname="pytorch", name="best"):
+		super().load_model("ddpg", dirname, name)
+
+class DDPGAgent(PTACAgent):
+	def __init__(self, state_size, action_size, decay=EPS_DECAY, lr=LEARN_RATE, gpu=True, load=None):
+		super().__init__(state_size, action_size, DDPGNetwork, lr=lr, decay=decay, gpu=gpu, load=load)
+
+	def get_action(self, state, eps=None, sample=True, e_greedy=False):
+		eps = self.eps if eps is None else eps
+		action_random = super().get_action(state, eps)
+		if e_greedy and random.random() < eps: return action_random
+		action_greedy = self.network.get_action(self.to_tensor(state), sample=sample)
+		action = action_greedy if e_greedy else np.clip((1-eps)*action_greedy + eps*action_random, -1, 1)
+		return action
+		
+	def train(self, state, action, next_state, reward, done):
+		self.buffer.append((state, action, reward, done))
+		if len(self.buffer) == self.update_freq:
+			states, actions, rewards, dones = map(self.to_tensor, zip(*self.buffer))
+			self.buffer.clear()	
+			next_state = self.to_tensor(next_state)
+			next_action = self.network.get_action(next_state, use_target=True, numpy=False)
+			values = self.network.get_q_value(states, actions, use_target=True, numpy=False)
+			next_value = self.network.get_q_value(next_state, next_action, use_target=True, numpy=False)
+			targets, advantages = self.compute_gae(next_value, rewards.unsqueeze(-1), dones.unsqueeze(-1), values)
+			states, actions, targets, advantages = [x.view(x.size(0)*x.size(1), *x.size()[2:]).cpu().numpy() for x in (states, actions, targets, advantages)]
+			self.replay_buffer.extend(zip(states, actions, targets, advantages))	
+		if len(self.replay_buffer) > 0:
+			(states, actions, targets, advantages), indices, importances = self.replay_buffer.sample(REPLAY_BATCH_SIZE, dtype=self.to_tensor)
+			errors = self.network.optimize(states, actions, targets, importances**(1-self.eps))
+			self.replay_buffer.update_priorities(indices, errors)
+			if done[0]: self.eps = max(self.eps * self.decay, EPS_MIN)
+
+REG_LAMBDA = 1e-6             	# Penalty multiplier to apply for the size of the network weights
+LEARN_RATE = 0.0001           	# Sets how much we want to update the network weights at each training step
+TARGET_UPDATE_RATE = 0.0004   	# How frequently we want to copy the local network to the target network (for double DQNs)
+INPUT_LAYER = 512				
+ACTOR_HIDDEN = 256
+CRITIC_HIDDEN = 1024
+DISCOUNT_RATE = 0.97
+NUM_STEPS = 100
+EPS_MAX = 1.0                 	# The starting proportion of random to greedy actions to take
+EPS_MIN = 0.1                 	# The lower limit proportion of random to greedy actions to take
+EPS_DECAY = 0.995             	# The rate at which eps decays from EPS_MAX to EPS_MIN
+ADVANTAGE_DECAY = 0.95
+MAX_BUFFER_SIZE = 100000      	# Sets the maximum length of the replay buffer
+
+Ep: 0, Reward: -71.2178, Test: -56.6076 [21.73], Avg: -78.3361 (0.980)
+Ep: 1, Reward: -54.7456, Test: -61.2315 [16.29], Avg: -77.9302 (0.960)
+Ep: 2, Reward: -49.9361, Test: -50.5248 [21.93], Avg: -76.1039 (0.941)
+Ep: 3, Reward: -62.9517, Test: -55.2680 [13.47], Avg: -74.2617 (0.922)
+Ep: 4, Reward: -38.2097, Test: -61.3094 [20.70], Avg: -75.8110 (0.904)
+Ep: 5, Reward: -46.2332, Test: -58.8821 [16.46], Avg: -75.7320 (0.886)
+Ep: 6, Reward: -49.7511, Test: -58.0353 [20.93], Avg: -76.1939 (0.868)
+Ep: 7, Reward: -47.3529, Test: -72.5507 [33.68], Avg: -79.9480 (0.851)
+Ep: 8, Reward: -52.1557, Test: -64.1238 [13.67], Avg: -79.7082 (0.834)
+Ep: 9, Reward: -54.9751, Test: -65.3589 [16.01], Avg: -79.8742 (0.817)
+Ep: 10, Reward: -62.1054, Test: -53.0112 [18.04], Avg: -79.0717 (0.801)
+Ep: 11, Reward: -48.9164, Test: -64.3341 [9.31], Avg: -78.6191 (0.785)
+Ep: 12, Reward: -49.0275, Test: -54.2440 [28.22], Avg: -78.9149 (0.769)
+Ep: 13, Reward: -64.6477, Test: -61.3511 [15.13], Avg: -78.7410 (0.754)
+Ep: 14, Reward: -60.4924, Test: -42.5645 [23.25], Avg: -77.8792 (0.739)
+Ep: 15, Reward: -38.4466, Test: -48.1233 [28.73], Avg: -77.8153 (0.724)
+Ep: 16, Reward: -61.3734, Test: -58.6037 [38.03], Avg: -78.9220 (0.709)
+Ep: 17, Reward: -49.0629, Test: -44.5324 [23.80], Avg: -78.3336 (0.695)
+Ep: 18, Reward: -46.0791, Test: -50.1213 [22.55], Avg: -78.0357 (0.681)
+Ep: 19, Reward: -44.2803, Test: -66.6488 [15.23], Avg: -78.2280 (0.668)
+Ep: 20, Reward: -34.6356, Test: -44.5226 [24.12], Avg: -77.7715 (0.654)
+Ep: 21, Reward: -54.7986, Test: -59.8401 [36.14], Avg: -78.5993 (0.641)
+Ep: 22, Reward: -55.9575, Test: -61.1122 [33.57], Avg: -79.2987 (0.628)
+Ep: 23, Reward: -31.2277, Test: -46.5969 [20.56], Avg: -78.7927 (0.616)
+Ep: 24, Reward: -46.9081, Test: -52.6821 [20.92], Avg: -78.5851 (0.603)
+Ep: 25, Reward: -31.2396, Test: -55.1638 [27.71], Avg: -78.7500 (0.591)
+Ep: 26, Reward: -55.8377, Test: -23.8948 [44.78], Avg: -78.3767 (0.580)
+Ep: 27, Reward: -35.9441, Test: -38.1745 [18.98], Avg: -77.6187 (0.568)
+Ep: 28, Reward: -58.5479, Test: -36.9621 [31.05], Avg: -77.2875 (0.557)
+Ep: 29, Reward: -46.4966, Test: -30.3491 [22.96], Avg: -76.4881 (0.545)
+Ep: 30, Reward: -25.5956, Test: -46.3804 [19.16], Avg: -76.1351 (0.535)
+Ep: 31, Reward: -8.2183, Test: -19.7894 [55.33], Avg: -76.1032 (0.524)
+Ep: 32, Reward: -31.3053, Test: -20.6515 [37.14], Avg: -75.5483 (0.513)
+Ep: 33, Reward: -43.5679, Test: -21.4853 [15.07], Avg: -74.4014 (0.503)

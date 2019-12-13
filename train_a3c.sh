@@ -29,7 +29,7 @@ run()
 	ports=()
 	for j in `seq 1 $numWorkers` 
 	do
-		port=$(($baseport+$j))
+		port=$((8000+$baseport+$j))
 		ports+=($port)
 		open_terminal "python3 -B train_a3c.py --selfport $port --iternum $iterNum" &
 	done

@@ -8,7 +8,7 @@ from models.ppo import PPOAgent
 from models.rand import RandomAgent
 from models.ddpg import DDPGAgent, EPS_MIN
 from utils.envs import EnsembleEnv, EnvManager, EnvWorker, WorldModel, ImgStack
-from utils.misc import Logger
+from utils.misc import Logger, rollout
 
 parser = argparse.ArgumentParser(description='PPO Trainer')
 parser.add_argument('--workerports', type=int, default=[16], nargs="+", help='how many worker servers to connect to')
@@ -48,18 +48,6 @@ class WorldACAgent(RandomAgent):
 		self.world_model.load_model(dirname, name)
 		self.acagent.network.load_model(dirname, name)
 		return self
-
-def rollout(env, agent, eps=None, render=False, sample=False):
-	state = env.reset()
-	total_reward = 0
-	done = False
-	with torch.no_grad():
-		while not done:
-			if render: env.render()
-			env_action = agent.get_env_action(env, state, eps, sample)[0]
-			state, reward, done, _ = env.step(env_action.reshape(-1))
-			total_reward += reward
-	return total_reward
 
 def run(model, statemodel, runs=1, load_dir="", ports=16):
 	logger = Logger(model, load_dir)

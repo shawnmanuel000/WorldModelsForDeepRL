@@ -5,20 +5,20 @@ import random
 import numpy as np
 from models.rand import RandomAgent, ReplayBuffer
 
-REG_LAMBDA = 1e-6             # Penalty multiplier to apply for the size of the network weights
-LEARN_RATE = 0.0001           # Sets how much we want to update the network weights at each training step
-TARGET_UPDATE_RATE = 0.0004   # How frequently we want to copy the local network to the target network (for double DQNs)
-INPUT_LAYER = 512
+REG_LAMBDA = 1e-6             	# Penalty multiplier to apply for the size of the network weights
+LEARN_RATE = 0.0001           	# Sets how much we want to update the network weights at each training step
+TARGET_UPDATE_RATE = 0.0004   	# How frequently we want to copy the local network to the target network (for double DQNs)
+INPUT_LAYER = 512				
 ACTOR_HIDDEN = 256
 CRITIC_HIDDEN = 1024
 
-DISCOUNT_RATE = 0.99
-NUM_STEPS = 20
-EPS_MAX = 1.0                 # The starting proportion of random to greedy actions to take
-EPS_MIN = 0.1                 # The lower limit proportion of random to greedy actions to take
-EPS_DECAY = 0.995             # The rate at which eps decays from EPS_MAX to EPS_MIN
+DISCOUNT_RATE = 0.97
+NUM_STEPS = 100
+EPS_MAX = 1.0                 	# The starting proportion of random to greedy actions to take
+EPS_MIN = 0.1                 	# The lower limit proportion of random to greedy actions to take
+EPS_DECAY = 0.995             	# The rate at which eps decays from EPS_MAX to EPS_MIN
 ADVANTAGE_DECAY = 0.99
-MAX_BUFFER_SIZE = 100000      # Sets the maximum length of the replay buffer
+MAX_BUFFER_SIZE = 100000      	# Sets the maximum length of the replay buffer
 
 class PTActor(torch.nn.Module):
 	def __init__(self, state_size, action_size):

@@ -10,7 +10,7 @@ from models.vae import VAE, LATENT_SIZE
 from models.mdrnn import MDRNNCell, HIDDEN_SIZE, ACTION_SIZE
 from models.controller import Controller, ControlAgent
 from utils.multiprocess import Manager, Worker
-from utils.misc import to_env, IMG_DIM, Logger
+from utils.misc import rollout, IMG_DIM, Logger
 
 parser = argparse.ArgumentParser(description='Controller Trainer')
 parser.add_argument('--workerports', type=int, default=None, nargs="+", help='how many worker servers to connect to')
@@ -47,18 +47,6 @@ class ControllerManager(Manager):
 			return scores
 		popsize = (max(popsize//self.num_clients, 1))*self.num_clients
 		train(save_dirname, get_scores, epochs, popsize=popsize)
-
-def rollout(env, agent, render=False):
-	state = env.reset()
-	total_reward = 0
-	done = False
-	with torch.no_grad():
-		while not done:
-			if render: env.render()
-			env_action = agent.get_env_action(env, state)[0]
-			state, reward, done, _ = env.step(env_action.reshape(-1))
-			total_reward += reward
-	return total_reward
 
 def train(save_dirname, get_scores, epochs=250, popsize=4, restarts=1):
 	logger = Logger(Controller, save_dirname, popsize=popsize, restarts=restarts)

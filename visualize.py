@@ -127,7 +127,7 @@ def visualize_qlearning(gpu=False, save="./tests/videos/qlearning.avi"):
 
 if __name__ == "__main__":
 	dirname = os.path.join(ROOT, f"iter{args.iternum}/")
-	evaluate_best(100, iternums=[args.iternum])
+	evaluate_best(1, iternums=[args.iternum])
 	# visualize_vae(100, dirname)
 	# visualize_mdrnn(200, dirname)
 	# visualize_controller(f"iter{args.iternum}/")

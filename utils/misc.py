@@ -56,6 +56,18 @@ def from_env(env, env_action):
 	action = 2*action_normal - 1
 	return action
 
+def rollout(env, agent, eps=None, render=False, sample=False):
+	state = env.reset()
+	total_reward = 0
+	done = False
+	with torch.no_grad():
+		while not done:
+			if render: env.render()
+			env_action = agent.get_env_action(env, state, eps, sample)[0]
+			state, reward, done, _ = env.step(env_action.reshape(-1))
+			total_reward += reward
+	return total_reward
+
 class Logger():
 	def __init__(self, model_class, load_dir, **kwconfig):
 		self.config = kwconfig

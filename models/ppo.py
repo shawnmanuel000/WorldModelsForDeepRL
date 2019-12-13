@@ -4,15 +4,14 @@ import pickle
 import argparse
 import numpy as np
 from models.rand import ReplayBuffer, PrioritizedReplayBuffer
-from utils.network import PTACNetwork, PTACAgent, Conv, INPUT_LAYER, ACTOR_HIDDEN, CRITIC_HIDDEN
+from utils.network import PTACNetwork, PTACAgent, Conv, INPUT_LAYER, ACTOR_HIDDEN, CRITIC_HIDDEN, LEARN_RATE
 
-LEARN_RATE = 0.0001
-EPS_MIN = 0.2                 # The lower limit proportion of random to greedy actions to take
-EPS_DECAY = 0.995             # The rate at which eps decays from EPS_MAX to EPS_MIN
-BATCH_SIZE = 5
+EPS_MIN = 0.2                 	# The lower limit proportion of random to greedy actions to take
+EPS_DECAY = 0.997             	# The rate at which eps decays from EPS_MAX to EPS_MIN
+BATCH_SIZE = 5					# 
 PPO_EPOCHS = 4
-ENTROPY_WEIGHT = 0.01
-CLIP_PARAM = 0.2
+ENTROPY_WEIGHT = 0.005
+CLIP_PARAM = 0.005
 
 class PPOActor(torch.nn.Module):
 	def __init__(self, state_size, action_size):
