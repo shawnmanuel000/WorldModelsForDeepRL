@@ -15,8 +15,8 @@ from utils.envs import ImgStack, WorldModel
 from train_a3c import WorldACAgent, rollout
 from data.loaders import ROOT
 
-parser = argparse.ArgumentParser(description='Visualizer')
-parser.add_argument('--iternum', type=int, default=-1, help='which port to listen on (as a worker server)')
+parser = argparse.ArgumentParser(description="Visualizer")
+parser.add_argument("--iternum", type=int, default=-1, help="Whether to use world model (0 or 1) or raw pixels (-1) [default]")
 args = parser.parse_args()
 
 def evaluate_best(runs=1, gpu=True, iternums=[-1, 0, 1]):
@@ -24,25 +24,25 @@ def evaluate_best(runs=1, gpu=True, iternums=[-1, 0, 1]):
 	env.env.verbose = 0
 	for iternum in iternums:
 		dirname = "pytorch" if iternum < 0 else f"iter{iternum}/"
-		for model in [DDPGAgent, PPOAgent]:
+		for model in [DDPGAgent]:#, PPOAgent]:
 			statemodel = ImgStack if iternum < 0 else WorldModel
 			agent = WorldACAgent(env.action_space.shape, 1, model, statemodel, load=dirname, gpu=gpu, train=False)
-			scores = [rollout(env, agent, eps=EPS_MIN, render=True) for _ in range(runs)]
-			# scores = []
-			# for ep in range(runs):
-			# 	scores.append(rollout(env, agent, eps=EPS_MIN, render=True))
-				# print(f"   Ep: {ep}, Score: {scores[-1]}")
+			# scores = [rollout(env, agent, eps=EPS_MIN, render=True) for _ in range(runs)]
+			scores = []
+			for ep in range(runs):
+				scores.append(rollout(env, agent, eps=EPS_MIN, render=True))
+				print(f"   Ep: {ep}, Score: {scores[-1]}")
 			mean = np.mean(scores)
 			std = np.std(scores)
 			print(f"It: {iternum}, Model: {model.__name__}, Mean: {mean}, Std: {std}")
-			for ep,score in enumerate(scores): print(f"   Ep: {ep}, Score: {score}")
+			# for ep,score in enumerate(scores): print(f"   Ep: {ep}, Score: {score}")
 
-		agent = ControlAgent(env.action_space.shape, load=dirname, gpu=True)
-		scores = [rollout(env, agent, render=True) for _ in range(runs)]
-		mean = np.mean(scores)
-		std = np.std(scores)
-		print(f"It: {iternum}, Model: Controller, Mean: {mean}, Std: {std}")
-		for ep,score in enumerate(scores): print(f"   Ep: {ep}, Score: {score}")
+		# agent = ControlAgent(env.action_space.shape, load=dirname, gpu=True)
+		# scores = [rollout(env, agent, render=True) for _ in range(runs)]
+		# mean = np.mean(scores)
+		# std = np.std(scores)
+		# print(f"It: {iternum}, Model: Controller, Mean: {mean}, Std: {std}")
+		# for ep,score in enumerate(scores): print(f"   Ep: {ep}, Score: {score}")
 	env.close()
 
 def visualize_vae(rollout, path="/home/shawn/Documents/world-models/datasets/carracing/openai/", save="./tests/videos/vae.avi"):
@@ -127,7 +127,7 @@ def visualize_qlearning(gpu=False, save="./tests/videos/qlearning.avi"):
 
 if __name__ == "__main__":
 	dirname = os.path.join(ROOT, f"iter{args.iternum}/")
-	evaluate_best(1, iternums=[args.iternum])
+	evaluate_best(100, iternums=[args.iternum])
 	# visualize_vae(100, dirname)
 	# visualize_mdrnn(200, dirname)
 	# visualize_controller(f"iter{args.iternum}/")

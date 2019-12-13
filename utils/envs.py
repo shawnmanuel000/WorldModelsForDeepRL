@@ -9,8 +9,8 @@ from models.mdrnn import MDRNNCell, HIDDEN_SIZE
 from utils.multiprocess import Manager, Worker
 from utils.misc import IMG_DIM
 
-FRAME_STACK = 2
-NUM_ENVS = 16
+FRAME_STACK = 2					# The number of consecutive image states to combine for training a3c on raw images
+NUM_ENVS = 16					# The default number of environments to simultaneously train the a3c in parallel
 
 class WorldModel():
 	def __init__(self, action_size, num_envs=1, load="", gpu=True):

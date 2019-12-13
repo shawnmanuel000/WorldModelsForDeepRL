@@ -10,13 +10,13 @@ from models.ddpg import DDPGAgent, EPS_MIN
 from utils.envs import EnsembleEnv, EnvManager, EnvWorker, WorldModel, ImgStack
 from utils.misc import Logger, rollout
 
-parser = argparse.ArgumentParser(description='PPO Trainer')
-parser.add_argument('--workerports', type=int, default=[16], nargs="+", help='how many worker servers to connect to')
-parser.add_argument('--selfport', type=int, default=None, help='which port to listen on (as a worker server)')
-parser.add_argument('--iternum', type=int, default=-1, help='whether to load last saved model')
-parser.add_argument('--runs', type=int, default=1, help='how many times to run the simulation')
-parser.add_argument('--model', type=str, default="ddpg", help='whether to load last saved model')
-parser.add_argument('--trial', action="store_true", help='whether to use image observations')
+parser = argparse.ArgumentParser(description="A3C Trainer")
+parser.add_argument("--workerports", type=int, default=[16], nargs="+", help="The list of worker ports to connect to")
+parser.add_argument("--selfport", type=int, default=None, help="Which port to listen on (as a worker server)")
+parser.add_argument("--iternum", type=int, default=-1, choices=[-1,0,1], help="Whether to train using World Model to load (0 or 1) or raw images (-1)")
+parser.add_argument("--model", type=str, default="ddpg", choices=["ddpg", "ppo"], help="Which reinforcement learning algorithm to use")
+parser.add_argument("--runs", type=int, default=1, help="Number of episodes to train the agent")
+parser.add_argument("--trial", action="store_true", help="Whether to show a trial run training on the Pendulum-v0 environment")
 args = parser.parse_args()
 
 ENV_NAME = "CarRacing-v0"

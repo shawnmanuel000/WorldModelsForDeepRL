@@ -12,11 +12,10 @@ from models.controller import Controller, ControlAgent
 from utils.multiprocess import Manager, Worker
 from utils.misc import rollout, IMG_DIM, Logger
 
-parser = argparse.ArgumentParser(description='Controller Trainer')
-parser.add_argument('--workerports', type=int, default=None, nargs="+", help='how many worker servers to connect to')
-parser.add_argument('--selfport', type=int, default=None, help='which port to listen on (as a worker server)')
-parser.add_argument('--iternum', type=int, default=0, help='which port to listen on (as a worker server)')
-parser.add_argument('--test', action="store_true", help='whether to just show a test rollout')
+parser = argparse.ArgumentParser(description="Controller Trainer")
+parser.add_argument("--workerports", type=int, default=None, nargs="+", help="The list of worker ports to connect to")
+parser.add_argument("--selfport", type=int, default=None, help="Which port to listen on (as a worker server)")
+parser.add_argument("--iternum", type=int, default=0, help="Which iteration of trained World Model to load")
 args = parser.parse_args()
 
 ENV_NAME = "CarRacing-v0"
@@ -67,12 +66,12 @@ def train(save_dirname, get_scores, epochs=250, popsize=4, restarts=1):
 				best_solution = best_params
 			logger.log(f"Ep: {run}-{start_epochs}, Best score: {best_params[1]:3.4f}, Min: {np.min(scores):.4f}, Avg: {np.mean(scores):.4f}")
 
-def run(load_dirname, test=False, gpu=True, iterations=1):
+def run(load_dirname, gpu=True, iterations=1):
 	env = gym.make(ENV_NAME)
 	env.env.verbose = 0
 	agent = ControlAgent(env.action_space.shape, gpu=gpu, load=load_dirname)
 	get_scores = lambda params: [np.mean([rollout(env, agent.set_params(p)) for _ in range(iterations)]) for p in params]
-	train(load_dirname, get_scores, 1000) if not test else rollout(env, agent, True)
+	train(load_dirname, get_scores, 1000)
 	env.close()
 
 if __name__ == "__main__":
@@ -82,4 +81,4 @@ if __name__ == "__main__":
 	elif args.workerports is not None:
 		ControllerManager(args.workerports).start(dirname, epochs=250, popsize=16)
 	else:
-		run(dirname, args.test, gpu=False)
+		run(dirname, gpu=False)

@@ -8,17 +8,39 @@ from models.rand import RandomAgent, ReplayBuffer
 REG_LAMBDA = 1e-6             	# Penalty multiplier to apply for the size of the network weights
 LEARN_RATE = 0.0001           	# Sets how much we want to update the network weights at each training step
 TARGET_UPDATE_RATE = 0.0004   	# How frequently we want to copy the local network to the target network (for double DQNs)
-INPUT_LAYER = 512				
-ACTOR_HIDDEN = 256
-CRITIC_HIDDEN = 1024
+INPUT_LAYER = 512				# The number of output nodes from the first layer to Actor and Critic networks
+ACTOR_HIDDEN = 256				# The number of nodes in the hidden layers of the Actor network
+CRITIC_HIDDEN = 1024			# The number of nodes in the hidden layers of the Critic networks
 
-DISCOUNT_RATE = 0.97
-NUM_STEPS = 100
+DISCOUNT_RATE = 0.97			# The discount rate to use in the Bellman Equation
+NUM_STEPS = 100					# The number of steps to collect experience in sequence for each GAE calculation
 EPS_MAX = 1.0                 	# The starting proportion of random to greedy actions to take
 EPS_MIN = 0.1                 	# The lower limit proportion of random to greedy actions to take
 EPS_DECAY = 0.995             	# The rate at which eps decays from EPS_MAX to EPS_MIN
-ADVANTAGE_DECAY = 0.99
+ADVANTAGE_DECAY = 0.99			# The discount factor for the cumulative GAE calculation
 MAX_BUFFER_SIZE = 100000      	# Sets the maximum length of the replay buffer
+
+class Conv(torch.nn.Module):
+	def __init__(self, state_size, output_size):
+		super().__init__()
+		self.conv1 = torch.nn.Conv2d(state_size[-1], 32, kernel_size=4, stride=2)
+		self.conv2 = torch.nn.Conv2d(32, 64, kernel_size=4, stride=2)
+		self.conv3 = torch.nn.Conv2d(64, 128, kernel_size=4, stride=2)
+		self.conv4 = torch.nn.Conv2d(128, 256, kernel_size=4, stride=2)
+		self.linear1 = torch.nn.Linear(1024, output_size)
+		self.apply(lambda m: torch.nn.init.xavier_normal_(m.weight) if type(m) in [torch.nn.Conv2d, torch.nn.Linear] else None)
+
+	def forward(self, state):
+		out_dims = state.size()[:-3]
+		state = state.view(-1, *state.size()[-3:])
+		state = self.conv1(state).tanh() # state: (batch, 32, 31, 31)
+		state = self.conv2(state).tanh() # state: (batch, 64, 14, 14)
+		state = self.conv3(state).tanh() # state: (batch, 128, 6, 6)
+		state = self.conv4(state).tanh() # state: (batch, 256, 2, 2)
+		state = state.view(state.size(0), -1) # state: (batch, 1024)
+		state = self.linear1(state).tanh() # state: (batch, 512)
+		state = state.view(*out_dims, -1)
+		return state
 
 class PTActor(torch.nn.Module):
 	def __init__(self, state_size, action_size):
@@ -57,12 +79,10 @@ class PTACNetwork():
 		self.actor_local = actor(state_size, action_size).to(self.device)
 		self.actor_target = actor(state_size, action_size).to(self.device)
 		self.actor_optimizer = torch.optim.Adam(self.actor_local.parameters(), lr=lr, weight_decay=REG_LAMBDA)
-		self.actor_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.actor_optimizer, factor=0.5, patience=25, min_lr=1e-5)
 		
 		self.critic_local = critic(state_size, action_size).to(self.device)
 		self.critic_target = critic(state_size, action_size).to(self.device)
 		self.critic_optimizer = torch.optim.Adam(self.critic_local.parameters(), lr=lr, weight_decay=REG_LAMBDA)
-		self.critic_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.critic_optimizer, factor=0.5, patience=25, min_lr=1e-5)
 		if load: self.load_model(load)
 
 	def init_weights(self, model=None):
@@ -74,10 +94,6 @@ class PTACNetwork():
 		loss.backward(retain_graph=retain)
 		optimizer.step()
 
-	def schedule(self, total_reward):
-		self.actor_scheduler.step(-total_reward)
-		self.critic_scheduler.step(-total_reward)
-		
 	def soft_copy(self, local, target):
 		for t,l in zip(target.parameters(), local.parameters()):
 			t.data.copy_(t.data + self.tau*(l.data - t.data))
@@ -125,28 +141,6 @@ class PTACAgent(RandomAgent):
 		
 	def train(self, state, action, next_state, reward, done):
 		pass
-
-class Conv(torch.nn.Module):
-	def __init__(self, state_size, output_size):
-		super().__init__()
-		self.conv1 = torch.nn.Conv2d(state_size[-1], 32, kernel_size=4, stride=2)
-		self.conv2 = torch.nn.Conv2d(32, 64, kernel_size=4, stride=2)
-		self.conv3 = torch.nn.Conv2d(64, 128, kernel_size=4, stride=2)
-		self.conv4 = torch.nn.Conv2d(128, 256, kernel_size=4, stride=2)
-		self.linear1 = torch.nn.Linear(1024, output_size)
-		self.apply(lambda m: torch.nn.init.xavier_normal_(m.weight) if type(m) in [torch.nn.Conv2d, torch.nn.Linear] else None)
-
-	def forward(self, state):
-		out_dims = state.size()[:-3]
-		state = state.view(-1, *state.size()[-3:])
-		state = self.conv1(state).tanh() # state: (batch, 32, 31, 31)
-		state = self.conv2(state).tanh() # state: (batch, 64, 14, 14)
-		state = self.conv3(state).tanh() # state: (batch, 128, 6, 6)
-		state = self.conv4(state).tanh() # state: (batch, 256, 2, 2)
-		state = state.view(state.size(0), -1) # state: (batch, 1024)
-		state = self.linear1(state).tanh() # state: (batch, 512)
-		state = state.view(*out_dims, -1)
-		return state
 
 def init_weights(m):
 	if type(m) == torch.nn.Linear:

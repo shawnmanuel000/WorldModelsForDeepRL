@@ -6,9 +6,9 @@ from models.vae import VAE
 from utils.misc import IMG_DIM
 from data.loaders import RolloutObservationDataset, ROOT
 
-parser = argparse.ArgumentParser(description='VAE Trainer')
-parser.add_argument('--epochs', type=int, default=100, help='how many worker servers to connect to')
-parser.add_argument('--iternum', type=int, default=0, help='which port to listen on (as a worker server)')
+parser = argparse.ArgumentParser(description="VAE Trainer")
+parser.add_argument("--epochs", type=int, default=100, help="Number of epochs to train the VAE")
+parser.add_argument("--iternum", type=int, default=0, help="Which iteration of world model to save VAE")
 args = parser.parse_args()
 
 torch.manual_seed(123)
@@ -60,8 +60,6 @@ def run(epochs=250, checkpoint_dirname="pytorch"):
 		vae.sample(1, save=True, folder=checkpoint_dirname)
 		if ep_test_losses[-1] <= np.min(ep_test_losses): vae.save_model(checkpoint_dirname)
 		print(f"Ep: {ep+1} / {epochs}, Train: {ep_train_losses[-1]:.4f}, Test: {ep_test_losses[-1]:.4f}")
-		with open(f"./logs/vae/logs.txt", "a+") as f:
-			f.write(f"Ep: {ep}, Train: {ep_train_losses[-1]}, Test: {ep_test_losses[-1]}\n")
 		
 if __name__ == "__main__":
 	run(args.epochs, f"iter{args.iternum}")

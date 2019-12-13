@@ -8,10 +8,10 @@ from utils.network import PTACNetwork, PTACAgent, Conv, INPUT_LAYER, ACTOR_HIDDE
 
 EPS_MIN = 0.2                 	# The lower limit proportion of random to greedy actions to take
 EPS_DECAY = 0.997             	# The rate at which eps decays from EPS_MAX to EPS_MIN
-BATCH_SIZE = 5					# 
-PPO_EPOCHS = 4
-ENTROPY_WEIGHT = 0.005
-CLIP_PARAM = 0.005
+BATCH_SIZE = 5					# Number of samples to train on for each train step
+PPO_EPOCHS = 4					# Number of iterations to sample batches for training
+ENTROPY_WEIGHT = 0.005			# The weight for the entropy term of the Actor loss
+CLIP_PARAM = 0.005				# The limit of the ratio of new action probabilities to old probabilities
 
 class PPOActor(torch.nn.Module):
 	def __init__(self, state_size, action_size):

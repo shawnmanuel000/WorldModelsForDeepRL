@@ -10,10 +10,10 @@ from models.controller import ControlAgent
 from models.rand import RandomAgent
 from data.loaders import ROOT
 
-parser = argparse.ArgumentParser(description='PPO Trainer')
-parser.add_argument('--nsamples', type=int, default=0, help='how many worker servers to connect to')
-parser.add_argument('--iternum', type=int, default=0, help='which port to listen on (as a worker server)')
-parser.add_argument('--datadir', type=str, default=ROOT, help='which port to listen on (as a worker server)')
+parser = argparse.ArgumentParser(description="Rollout Generator")
+parser.add_argument("--nsamples", type=int, default=0, help="How many rollouts to save")
+parser.add_argument("--iternum", type=int, default=0, choices=[0,1], help="Which iteration of trained World Model to load (0 or 1)")
+parser.add_argument("--datadir", type=str, default=ROOT, help="The directory path to save the sampled rollouts")
 args = parser.parse_args()
 
 class RolloutCollector():

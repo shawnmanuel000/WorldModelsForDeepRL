@@ -6,13 +6,11 @@ import matplotlib.pyplot as plt
 from torchvision import transforms
 from models.vae import LATENT_SIZE
 
-ACTION_SIZE = 3
-HIDDEN_SIZE = 256
-N_GAUSS = 5
-LEARNING_RATE = 0.001
-ALPHA = 0.9
-LR_FACTOR = 0.5
-LR_PATIENCE = 5
+ACTION_SIZE = 3					# The number of continuous action values required by the CarRacing-v0 environment
+HIDDEN_SIZE = 256				# The number of nodes in the hidden layer output by the MDRNN
+N_GAUSS = 5						# The number of Gaussian parameters to output for the mixture of Gaussians
+LEARNING_RATE = 0.001			# Sets how much we want to update the network weights at each training step
+ALPHA = 0.9						# The decay rate of the learning rate
 
 class MDRNN(torch.nn.Module):
 	def __init__(self, action_size=ACTION_SIZE, latent_size=LATENT_SIZE, hidden_size=HIDDEN_SIZE, n_gauss=N_GAUSS, load="", gpu=True):
@@ -25,7 +23,7 @@ class MDRNN(torch.nn.Module):
 		self.lstm = torch.nn.LSTM(action_size + latent_size, hidden_size).to(self.device)
 		self.gmm = torch.nn.Linear(hidden_size, (2*latent_size+1)*n_gauss + 2).to(self.device)
 		self.optimizer = torch.optim.RMSprop(self.parameters(), lr=LEARNING_RATE, alpha=ALPHA)
-		self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, factor=LR_FACTOR, patience=LR_PATIENCE)
+		self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, factor=0.5, patience=5)
 		if load: self.load_model(load)
 
 	def forward(self, actions, latents):

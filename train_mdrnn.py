@@ -6,16 +6,16 @@ from models.mdrnn import MDRNN
 from models.vae import VAE, LATENT_SIZE
 from data.loaders import RolloutSequenceDataset, ROOT
 
-parser = argparse.ArgumentParser(description='MDRNN Trainer')
-parser.add_argument('--epochs', type=int, default=50, help='how many worker servers to connect to')
-parser.add_argument('--iternum', type=int, default=0, help='which port to listen on (as a worker server)')
+parser = argparse.ArgumentParser(description="MDRNN Trainer")
+parser.add_argument("--epochs", type=int, default=50, help="Number of epochs to train the VAE")
+parser.add_argument("--iternum", type=int, default=0, help="Which iteration of world model to save MDRNN")
 args = parser.parse_args()
 
 SEQ_LEN = 32
 BATCH_SIZE = 16
 TRAIN_BUFFER = 30
 TEST_BUFFER = 10
-NUM_WORKERS = 0
+NUM_WORKERS = 8
 
 def get_data_loaders(dataset_path=ROOT):
 	transform = transforms.Lambda(lambda x: np.transpose(x, (0, 3, 1, 2)) / 255)
@@ -63,8 +63,6 @@ def run(epochs=50, checkpoint_dirname="pytorch"):
 		mdrnn.save_model(checkpoint_dirname, "latest")
 		if ep_test_losses[-1] <= np.min(ep_test_losses): mdrnn.save_model(checkpoint_dirname)
 		print(f"Ep: {ep+1} / {epochs}, Train: {ep_train_losses[-1]:.4f}, Test: {ep_test_losses[-1]:.4f}")
-		with open(f"logs/mdrnn/logs.txt", "a+") as f:
-			f.write(f"Ep: {ep}, Train: {ep_train_losses[-1]}, Test: {ep_test_losses[-1]}\n")
 		
 if __name__ == "__main__":
 	run(args.epochs, f"iter{args.iternum}")

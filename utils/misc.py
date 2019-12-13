@@ -10,11 +10,10 @@ import matplotlib.pyplot as plt
 from models.vae import VAE
 from models.mdrnn import MDRNNCell
 
-IMG_DIM = 64
+IMG_DIM = 64					# The height and width to scale the environment image to
 
 def rgb2gray(image):
 	gray = np.dot(image, [0.299, 0.587, 0.114]).astype(np.float32)
-	# norm = gray / 128.0 - 1.0
 	return gray
 
 def resize(image, dim=IMG_DIM):

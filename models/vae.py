@@ -3,10 +3,8 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 
-IMG_CHANNELS = 3
-LATENT_SIZE = 32
-LR_FACTOR = 0.5
-LR_PATIENCE = 5
+IMG_CHANNELS = 3				# The number of channels of the input state image
+LATENT_SIZE = 32				# The size of the latent vector output by the encoder network
 
 class Encoder(torch.nn.Module):
 	def __init__(self, img_channels, latent_size):
@@ -53,7 +51,7 @@ class VAE(torch.nn.Module):
 		self.encoder = Encoder(img_channels, latent_size).to(self.device)
 		self.decoder = Decoder(img_channels, latent_size).to(self.device)
 		self.optimizer = torch.optim.Adam(self.parameters())
-		self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, factor=LR_FACTOR, patience=LR_PATIENCE)
+		self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, factor=0.5, patience=5)
 		self.latent_size = latent_size
 		if load: self.load_model(load)
 
