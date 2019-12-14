@@ -9,9 +9,10 @@ ctrl0 = "logs_10.txt"
 ctrl1 = "logs_9.txt"
 
 ddpg = "logs_11.txt"
-ddpg0 = "logs_10.txt"
-ddpg1 = "logs_8.txt"
-# ddpg1 = "iter1/logs_3.txt"
+# ddpg0 = "logs_10.txt"
+ddpg0 = "iter1/logs_3.txt"
+# ddpg1 = "logs_8.txt"
+ddpg1 = "iter1/logs_6.txt"
 
 ppo = "logs_13.txt"
 ppo0 = "logs_11.txt"

@@ -13,11 +13,11 @@ ACTOR_HIDDEN = 256				# The number of nodes in the hidden layers of the Actor ne
 CRITIC_HIDDEN = 1024			# The number of nodes in the hidden layers of the Critic networks
 
 DISCOUNT_RATE = 0.97			# The discount rate to use in the Bellman Equation
-NUM_STEPS = 100					# The number of steps to collect experience in sequence for each GAE calculation
+NUM_STEPS = 1000				# The number of steps to collect experience in sequence for each GAE calculation
 EPS_MAX = 1.0                 	# The starting proportion of random to greedy actions to take
 EPS_MIN = 0.1                 	# The lower limit proportion of random to greedy actions to take
 EPS_DECAY = 0.995             	# The rate at which eps decays from EPS_MAX to EPS_MIN
-ADVANTAGE_DECAY = 0.99			# The discount factor for the cumulative GAE calculation
+ADVANTAGE_DECAY = 0.95			# The discount factor for the cumulative GAE calculation
 MAX_BUFFER_SIZE = 100000      	# Sets the maximum length of the replay buffer
 
 class Conv(torch.nn.Module):

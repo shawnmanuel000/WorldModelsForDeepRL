@@ -97,7 +97,7 @@ class DDPGAgent(PTACAgent):
 		
 	def train(self, state, action, next_state, reward, done):
 		self.buffer.append((state, action, reward, done))
-		if len(self.buffer) == self.update_freq:
+		if len(self.buffer) >= int(self.update_freq * (1 - (self.eps - EPS_MIN))):
 			states, actions, rewards, dones = map(self.to_tensor, zip(*self.buffer))
 			self.buffer.clear()	
 			next_state = self.to_tensor(next_state)
