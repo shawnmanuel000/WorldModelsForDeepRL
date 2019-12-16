@@ -50,8 +50,8 @@ class WorldACAgent(RandomAgent):
 		return self
 
 def run(model, statemodel, runs=1, load_dir="", ports=16):
-	logger = Logger(model, load_dir)
 	num_envs = len(ports) if type(ports) == list else min(ports, 16)
+	logger = Logger(model, load_dir, statemodel=statemodel, num_envs=num_envs)
 	envs = EnvManager(ENV_NAME, ports) if type(ports) == list else EnsembleEnv(ENV_NAME, ports)
 	agent = WorldACAgent(envs.action_size, num_envs, model, statemodel, load=load_dir)
 	states = envs.reset()

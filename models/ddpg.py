@@ -6,7 +6,7 @@ import numpy as np
 from models.rand import RandomAgent, PrioritizedReplayBuffer, ReplayBuffer
 from utils.network import PTACNetwork, PTACAgent, Conv, INPUT_LAYER, ACTOR_HIDDEN, CRITIC_HIDDEN, LEARN_RATE
 
-EPS_MIN = 0.01                	# The lower limit proportion of random to greedy actions to take
+EPS_MIN = 0.0225               	# The lower limit proportion of random to greedy actions to take
 EPS_DECAY = 0.980             	# The rate at which eps decays from EPS_MAX to EPS_MIN
 REPLAY_BATCH_SIZE = 32        	# How many experience tuples to sample from the buffer for each train step
 NUM_STEPS = 1000				# The number of steps to collect experience in sequence for each GAE calculation

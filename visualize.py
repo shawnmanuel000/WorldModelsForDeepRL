@@ -16,7 +16,8 @@ from train_a3c import WorldACAgent, rollout
 from data.loaders import ROOT
 
 parser = argparse.ArgumentParser(description="Visualizer")
-parser.add_argument("--iternum", type=int, default=-1, help="Whether to use world model (0 or 1) or raw pixels (-1) [default]")
+parser.add_argument("--iternum", type=int, default=1, help="Whether to use world model (0 or 1) or raw pixels (-1) [default]")
+parser.add_argument("--runs", type=int, default=1, help="Number of episodes to train the agent")
 args = parser.parse_args()
 
 def evaluate_best(runs=1, gpu=True, iternums=[-1, 0, 1]):
@@ -35,7 +36,7 @@ def evaluate_best(runs=1, gpu=True, iternums=[-1, 0, 1]):
 			mean = np.mean(scores)
 			std = np.std(scores)
 			print(f"It: {iternum}, Model: {model.__name__}, Mean: {mean}, Std: {std}")
-			for ep,score in enumerate(scores): print(f"   Ep: {ep}, Score: {score}")
+			# for ep,score in enumerate(scores): print(f"   Ep: {ep}, Score: {score}")
 
 		# agent = ControlAgent(env.action_space.shape, load=dirname, gpu=True)
 		# scores = [rollout(env, agent, render=True) for _ in range(runs)]
@@ -127,7 +128,7 @@ def visualize_qlearning(gpu=False, save="./tests/videos/qlearning.avi"):
 
 if __name__ == "__main__":
 	dirname = os.path.join(ROOT, f"iter{args.iternum}/")
-	evaluate_best(100, iternums=[args.iternum])
+	evaluate_best(args.runs, iternums=[args.iternum])
 	# visualize_vae(100, dirname)
 	# visualize_mdrnn(200, dirname)
 	# visualize_controller(f"iter{args.iternum}/")
