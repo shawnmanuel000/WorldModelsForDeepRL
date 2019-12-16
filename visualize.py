@@ -30,12 +30,12 @@ def evaluate_best(runs=1, gpu=True, iternums=[-1, 0, 1]):
 			# scores = [rollout(env, agent, eps=EPS_MIN, render=True) for _ in range(runs)]
 			scores = []
 			for ep in range(runs):
-				scores.append(rollout(env, agent, eps=EPS_MIN, render=True))
+				scores.append(rollout(env, agent, eps=EPS_MIN, render=False))
 				print(f"   Ep: {ep}, Score: {scores[-1]}")
 			mean = np.mean(scores)
 			std = np.std(scores)
 			print(f"It: {iternum}, Model: {model.__name__}, Mean: {mean}, Std: {std}")
-			# for ep,score in enumerate(scores): print(f"   Ep: {ep}, Score: {score}")
+			for ep,score in enumerate(scores): print(f"   Ep: {ep}, Score: {score}")
 
 		# agent = ControlAgent(env.action_space.shape, load=dirname, gpu=True)
 		# scores = [rollout(env, agent, render=True) for _ in range(runs)]

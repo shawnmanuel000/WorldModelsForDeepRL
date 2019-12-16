@@ -6,12 +6,13 @@ import numpy as np
 from models.rand import ReplayBuffer, PrioritizedReplayBuffer
 from utils.network import PTACNetwork, PTACAgent, Conv, INPUT_LAYER, ACTOR_HIDDEN, CRITIC_HIDDEN, LEARN_RATE
 
-EPS_MIN = 0.02                 	# The lower limit proportion of random to greedy actions to take
+EPS_MIN = 0.2                 	# The lower limit proportion of random to greedy actions to take
 EPS_DECAY = 0.997             	# The rate at which eps decays from EPS_MAX to EPS_MIN
-BATCH_SIZE = 32					# Number of samples to train on for each train step
+BATCH_SIZE = 5					# Number of samples to train on for each train step
 PPO_EPOCHS = 4					# Number of iterations to sample batches for training
 ENTROPY_WEIGHT = 0.005			# The weight for the entropy term of the Actor loss
 CLIP_PARAM = 0.005				# The limit of the ratio of new action probabilities to old probabilities
+NUM_STEPS = 100					# The number of steps to collect experience in sequence for each GAE calculation
 
 class PPOActor(torch.nn.Module):
 	def __init__(self, state_size, action_size):
@@ -65,7 +66,7 @@ class PPONetwork(PTACNetwork):
 			value = self.critic_local(state.to(self.device))
 			return value
 
-	def optimize(self, states, actions, old_log_probs, targets, advantages, importances=1, clip_param=CLIP_PARAM, e_weight=ENTROPY_WEIGHT):
+	def optimize(self, states, actions, old_log_probs, targets, advantages, importances=1, clip_param=CLIP_PARAM, e_weight=ENTROPY_WEIGHT, scale=1):
 		values = self.get_value(states)
 		critic_error = values - targets
 		critic_loss = importances.to(self.device) + critic_error.pow(2)
@@ -74,7 +75,7 @@ class PPONetwork(PTACNetwork):
 		entropy, new_log_probs = self.get_action_probs(states, actions)
 		ratio = (new_log_probs - old_log_probs).exp()
 		ratio_clipped = torch.clamp(ratio, 1.0-clip_param, 1.0+clip_param)
-		actor_loss = -(torch.min(ratio*advantages, ratio_clipped*advantages).mean() + e_weight*entropy)
+		actor_loss = -(torch.min(ratio*advantages, ratio_clipped*advantages).mean() + e_weight*entropy) * scale
 		self.step(self.actor_optimizer, actor_loss)
 		return critic_error.cpu().detach().numpy().squeeze(-1)
 
@@ -85,8 +86,9 @@ class PPONetwork(PTACNetwork):
 		super().load_model("ppo", dirname, name)
 
 class PPOAgent(PTACAgent):
-	def __init__(self, state_size, action_size, decay=EPS_DECAY, lr=LEARN_RATE, gpu=True, load=None):
-		super().__init__(state_size, action_size, PPONetwork, lr=lr, decay=decay, gpu=gpu, load=load)
+	def __init__(self, state_size, action_size, decay=EPS_DECAY, lr=LEARN_RATE, update_freq=NUM_STEPS, gpu=True, load=None):
+		super().__init__(state_size, action_size, PPONetwork, lr=lr, update_freq=update_freq, decay=decay, gpu=gpu, load=load)
+		self.replay_buffer = PrioritizedReplayBuffer()
 		self.ppo_epochs = PPO_EPOCHS
 		self.ppo_batch = BATCH_SIZE
 
@@ -97,7 +99,7 @@ class PPOAgent(PTACAgent):
 
 	def train(self, state, action, next_state, reward, done):
 		self.buffer.append((state, self.action, self.log_prob, reward, done))
-		if len(self.buffer) == self.update_freq:
+		if len(self.buffer) >= int(self.update_freq * (1 - self.eps + EPS_MIN)**0.0):
 			states, actions, log_probs, rewards, dones = map(self.to_tensor, zip(*self.buffer))
 			self.buffer.clear()
 			next_state = self.to_tensor(next_state)
@@ -108,6 +110,6 @@ class PPOAgent(PTACAgent):
 			self.replay_buffer.clear().extend(zip(states, actions, log_probs, targets, advantages))
 			for _ in range(self.ppo_epochs*states.size(0)//self.ppo_batch):
 				(states, actions, log_probs, targets, advantages), indices, importances = self.replay_buffer.sample(self.ppo_batch, dtype=torch.stack)
-				errors = self.network.optimize(states, actions, log_probs, targets, advantages, importances**(1-self.eps), CLIP_PARAM*self.eps)
+				errors = self.network.optimize(states, actions, log_probs, targets, advantages, importances**(1-self.eps), scale=20/self.update_freq)
 				self.replay_buffer.update_priorities(indices, errors)
 		if done[0]: self.eps = max(self.eps * self.decay, EPS_MIN)
