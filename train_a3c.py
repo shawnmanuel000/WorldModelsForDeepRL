@@ -37,8 +37,9 @@ class WorldACAgent(RandomAgent):
 		next_state = self.world_model.get_state(next_state)[0]
 		self.acagent.train(state, action, next_state, reward, done)
 
-	def reset(self, num_envs):
-		self.world_model.reset(num_envs, restore=num_envs>1)
+	def reset(self, num_envs=None):
+		num_envs = self.world_model.num_envs if num_envs is None else num_envs
+		self.world_model.reset(num_envs, restore=False)
 		return self
 
 	def save_model(self, dirname="pytorch", name="best"):
@@ -54,9 +55,9 @@ def run(model, statemodel, runs=1, load_dir="", ports=16):
 	logger = Logger(model, load_dir, statemodel=statemodel, num_envs=num_envs)
 	envs = EnvManager(ENV_NAME, ports) if type(ports) == list else EnsembleEnv(ENV_NAME, ports)
 	agent = WorldACAgent(envs.action_size, num_envs, model, statemodel, load=load_dir)
-	states = envs.reset()
 	total_rewards = []
 	for ep in range(runs):
+		states = envs.reset()
 		agent.reset(num_envs)
 		total_reward = 0
 		for _ in range(envs.env.spec.max_episode_steps):

@@ -6,13 +6,15 @@ import numpy as np
 from models.rand import ReplayBuffer, PrioritizedReplayBuffer
 from utils.network import PTACNetwork, PTACAgent, Conv, INPUT_LAYER, ACTOR_HIDDEN, CRITIC_HIDDEN, LEARN_RATE
 
-EPS_MIN = 0.2                 	# The lower limit proportion of random to greedy actions to take
-EPS_DECAY = 0.997             	# The rate at which eps decays from EPS_MAX to EPS_MIN
+EPS_MIN = 0.5                 	# The lower limit proportion of random to greedy actions to take
+EPS_DECAY = 1.000             	# The rate at which eps decays from EPS_MAX to EPS_MIN
 BATCH_SIZE = 5					# Number of samples to train on for each train step
 PPO_EPOCHS = 4					# Number of iterations to sample batches for training
 ENTROPY_WEIGHT = 0.005			# The weight for the entropy term of the Actor loss
 CLIP_PARAM = 0.005				# The limit of the ratio of new action probabilities to old probabilities
-NUM_STEPS = 100					# The number of steps to collect experience in sequence for each GAE calculation
+DISCOUNT_RATE = 0.97			# The discount rate to use in the Bellman Equation
+NUM_STEPS = 20					# The number of steps to collect experience in sequence for each GAE calculation
+ADVANTAGE_DECAY = 0.99			# The discount factor for the cumulative GAE calculation
 
 class PPOActor(torch.nn.Module):
 	def __init__(self, state_size, action_size):
@@ -105,11 +107,11 @@ class PPOAgent(PTACAgent):
 			next_state = self.to_tensor(next_state)
 			values = self.network.get_value(states, grad=False)
 			next_value = self.network.get_value(next_state, grad=False)
-			targets, advantages = self.compute_gae(next_value, rewards.unsqueeze(-1), dones.unsqueeze(-1), values)
+			targets, advantages = self.compute_gae(next_value, rewards.unsqueeze(-1), dones.unsqueeze(-1), values, gamma=DISCOUNT_RATE, lamda=ADVANTAGE_DECAY)
 			states, actions, log_probs, targets, advantages = [x.view(x.size(0)*x.size(1), *x.size()[2:]) for x in (states, actions, log_probs, targets, advantages)]
 			self.replay_buffer.clear().extend(zip(states, actions, log_probs, targets, advantages))
 			for _ in range(self.ppo_epochs*states.size(0)//self.ppo_batch):
 				(states, actions, log_probs, targets, advantages), indices, importances = self.replay_buffer.sample(self.ppo_batch, dtype=torch.stack)
-				errors = self.network.optimize(states, actions, log_probs, targets, advantages, importances**(1-self.eps), scale=20/self.update_freq)
+				errors = self.network.optimize(states, actions, log_probs, targets, advantages, importances**(1-self.eps), scale=self.eps)
 				self.replay_buffer.update_priorities(indices, errors)
 		if done[0]: self.eps = max(self.eps * self.decay, EPS_MIN)

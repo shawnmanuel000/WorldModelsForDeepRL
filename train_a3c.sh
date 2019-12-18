@@ -41,11 +41,11 @@ run()
 
 for iter in ${iternums[@]}
 do
-	runs=250
-	if [ $model = "ddpg" ]
-	then
-		runs=500
-	fi 
+	runs=500
+	# if [ $model = "ddpg" ]
+	# then
+	# 	runs=500
+	# fi 
 	run $workers $runs $model $iter
 done
 

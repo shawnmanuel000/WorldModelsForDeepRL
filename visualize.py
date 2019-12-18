@@ -28,14 +28,14 @@ def evaluate_best(runs=1, gpu=True, iternums=[-1, 0, 1]):
 		for model in [DDPGAgent]:#, PPOAgent]:
 			statemodel = ImgStack if iternum < 0 else WorldModel
 			agent = WorldACAgent(env.action_space.shape, 1, model, statemodel, load=dirname, gpu=gpu, train=False)
-			# scores = [rollout(env, agent, eps=EPS_MIN, render=True) for _ in range(runs)]
+			# scores = [rollout(env, agent.reset(), eps=EPS_MIN, render=True) for _ in range(runs)]
 			scores = []
 			for ep in range(runs):
-				scores.append(rollout(env, agent, eps=EPS_MIN, render=False))
+				scores.append(rollout(env, agent.reset(), eps=EPS_MIN, render=False))
 				print(f"   Ep: {ep}, Score: {scores[-1]}")
 			mean = np.mean(scores)
 			std = np.std(scores)
-			print(f"It: {iternum}, Model: {model.__name__}, Mean: {mean}, Std: {std}")
+			print(f"It: {iternum}, Model: {model.__name__}, Mean: {mean}, Std: {std} ({EPS_MIN:.4f})")
 			# for ep,score in enumerate(scores): print(f"   Ep: {ep}, Score: {score}")
 
 		# agent = ControlAgent(env.action_space.shape, load=dirname, gpu=True)

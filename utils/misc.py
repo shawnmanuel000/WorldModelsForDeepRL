@@ -76,7 +76,8 @@ class Logger():
 		os.makedirs(f"logs/{self.model_name}/{load_dir}/", exist_ok=True)
 		self.run_num = len([n for n in os.listdir(f"logs/{self.model_name}/{load_dir}/")])
 		self.model_src = [line for line in open(inspect.getabsfile(self.model_class))]
-		self.net_src = [line for line in open(f"utils/network.py") if re.match("^[A-Z]", line)] if self.model_name in ["ddpg", "ppo"] else []
+		self.net_src = [line for line in open(f"utils/network.py") if re.match("^[A-Z]", line)] if self.model_name in ["ddpg", "ppo"] else None
+		self.trn_src = [line for line in open(f"train_a3c.py")] if self.model_name in ["ddpg", "ppo"] else None
 		self.log_path = f"logs/{self.model_name}/{load_dir}/logs_{self.run_num}.txt"
 		self.log_num = 0
 
@@ -84,9 +85,11 @@ class Logger():
 		with open(self.log_path, "a+") as f:
 			if self.log_num == 0: 
 				f.write(f"Model: {self.model_class}, Dir: {self.load_dir}\n")
-				f.writelines(" ".join([f"{k}: {v}," for k,v in self.config.items()]) + "\n\n")
-				f.writelines(self.model_src + ["\n"])
-				f.writelines(self.net_src + ["\n"])
+				if self.config: f.writelines(" ".join([f"{k}: {v}," for k,v in self.config.items()]) + "\n\n")
+				if self.model_src: f.writelines(self.model_src + ["\n"])
+				if self.net_src: f.writelines(self.net_src + ["\n"])
+				if self.trn_src: f.writelines(self.trn_src + ["\n"])
+				f.write("\n")
 			f.write(f"{string}\n")
 		if debug: print(string)
 		self.log_num += 1

@@ -15,7 +15,7 @@ CRITIC_HIDDEN = 1024			# The number of nodes in the hidden layers of the Critic 
 DISCOUNT_RATE = 0.97			# The discount rate to use in the Bellman Equation
 NUM_STEPS = 1000				# The number of steps to collect experience in sequence for each GAE calculation
 EPS_MAX = 1.0                 	# The starting proportion of random to greedy actions to take
-EPS_MIN = 0.1                 	# The lower limit proportion of random to greedy actions to take
+EPS_MIN = 0.0225               	# The lower limit proportion of random to greedy actions to take
 EPS_DECAY = 0.995             	# The rate at which eps decays from EPS_MAX to EPS_MIN
 ADVANTAGE_DECAY = 0.95			# The discount factor for the cumulative GAE calculation
 MAX_BUFFER_SIZE = 100000      	# Sets the maximum length of the replay buffer
@@ -127,14 +127,14 @@ class PTACAgent(RandomAgent):
 		action_random = super().get_action(state, eps)
 		return action_random
 
-	def compute_gae(self, last_value, rewards, dones, values, gamma=DISCOUNT_RATE, tau=ADVANTAGE_DECAY):
+	def compute_gae(self, last_value, rewards, dones, values, gamma=DISCOUNT_RATE, lamda=ADVANTAGE_DECAY):
 		with torch.no_grad():
 			gae = 0
 			targets = torch.zeros_like(values, device=values.device)
 			values = torch.cat([values, last_value.unsqueeze(0)])
 			for step in reversed(range(len(rewards))):
 				delta = rewards[step] + gamma * values[step + 1] * (1-dones[step]) - values[step]
-				gae = delta + gamma * tau * (1-dones[step]) * gae
+				gae = delta + gamma * lamda * (1-dones[step]) * gae
 				targets[step] = gae + values[step]
 			advantages = targets - values[:-1]
 			return targets, advantages
