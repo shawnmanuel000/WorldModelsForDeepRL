@@ -1,4 +1,4 @@
-import asyncio
+import pickle
 import numpy as np
 import socket as Socket
 
@@ -36,7 +36,6 @@ class Manager():
 			try:
 				sock = Socket.socket(Socket.AF_INET, Socket.SOCK_STREAM)
 				sock.connect(("localhost", port))
-				sock.setblocking(False)
 				client_sockets[port] = sock
 			except Exception:
 				print("Couldn't connect to {}".format(port))
@@ -44,21 +43,19 @@ class Manager():
 
 	def send_params(self, params, encoded=False):
 		for p,port in zip(params, self.client_ports):
-			p = p if encoded else p.tostring()
+			# p = p if encoded else p.tostring()
 			self.client_sockets[port].sendall(p)
 
 	def await_results(self, converter=lambda x: x, decoded=False):
 		responses = {}
-		loop = asyncio.get_event_loop()
-		async def wait_score(port, socket):
-			data = await loop.sock_recv(socket, 100000)
-			responses[port] = converter(data if decoded else data.decode())
-		coroutines = [wait_score(port, socket) for port,socket in self.client_sockets.items()]
-		loop.run_until_complete(asyncio.wait(coroutines))
+		for port, sock in self.client_sockets.items():
+			# data = sock.recv(100000)
+			responses[port] = converter(sock.recv(100000))
 		return [responses[port] for port in self.client_ports]
 
 	def __del__(self):
-		for sock in self.client_sockets.values(): 
-			sock.sendall(np.zeros([], dtype=np.float64).tostring())
+		self.send_params([pickle.dumps({"cmd": "CLOSE", "item": [0.0]}) for _ in range(self.num_clients)], encoded=True)
+		# for sock in self.client_sockets.values(): 
+		# 	sock.sendall(np.zeros([], dtype=np.float64).tostring())
 		for sock in self.client_sockets.values():
 			sock.close()

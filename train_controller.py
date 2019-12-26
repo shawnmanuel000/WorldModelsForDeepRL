@@ -1,7 +1,6 @@
 import cma
 import gym
-import torch
-import asyncio
+import pickle
 import argparse
 import numpy as np
 import socket as Socket
@@ -27,13 +26,12 @@ class ControllerWorker(Worker):
 		agent = ControlAgent(env.action_space.shape, gpu=gpu, load=load_dirname)
 		episode = 0
 		while True:
-			episode += 1
-			data = self.conn.recv(20000)
-			params = np.frombuffer(data, dtype=np.float64)
-			if params.shape[0] != 867: break
-			score = np.mean([rollout(env, agent.set_params(params), render=False) for _ in range(iterations)])
-			self.conn.sendall(f"{score}".encode())
+			data = pickle.loads(self.conn.recv(100000))
+			if not "cmd" in data or data["cmd"] != "ROLLOUT": break
+			score = np.mean([rollout(env, agent.set_params(data["item"]), render=False) for _ in range(iterations)])
+			self.conn.sendall(pickle.dumps(score))
 			print(f"Ep: {episode}, Score: {score:.4f}")
+			episode += 1
 		env.close()
 
 class ControllerManager(Manager):
@@ -41,8 +39,8 @@ class ControllerManager(Manager):
 		def get_scores(params):
 			scores = []
 			for i in range(0, len(params), self.num_clients):
-				self.send_params(params[i:i+self.num_clients])
-				scores.extend(self.await_results(converter=float))
+				self.send_params([pickle.dumps({"cmd": "ROLLOUT", "item": params[i+j]}) for j in range(self.num_clients)])
+				scores.extend(self.await_results(converter=pickle.loads))
 			return scores
 		popsize = (max(popsize//self.num_clients, 1))*self.num_clients
 		train(save_dirname, get_scores, epochs, popsize=popsize)

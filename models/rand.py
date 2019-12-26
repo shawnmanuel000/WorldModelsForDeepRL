@@ -67,6 +67,9 @@ class ReplayBuffer():
 	def update_priorities(self, indices, errors, offset=0.1):
 		pass
 
+	def reset_priorities(self):
+		pass
+
 	def __len__(self):
 		return len(self.buffer)
 
@@ -104,6 +107,10 @@ class PrioritizedReplayBuffer(ReplayBuffer):
 	def update_priorities(self, indices, errors, offset=0.1):
 		for i,e in zip(indices, errors):
 			self.priorities[i] = abs(e) + offset
+
+	def reset_priorities(self):
+		for i in range(len(self.priorities)):
+			self.priorities[i] = 1
 
 class NoisyLinear(torch.nn.Linear):
 	def __init__(self, in_features, out_features, sigma_init=0.017, bias=True):

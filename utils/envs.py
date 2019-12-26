@@ -152,7 +152,7 @@ class EnvWorker(Worker):
 		step = 0
 		rewards = 0
 		while True:
-			data = pickle.loads(self.conn.recv(20000))
+			data = pickle.loads(self.conn.recv(100000))
 			if data["cmd"] == "RESET":
 				message = self.env.reset()
 				rewards = 0
@@ -181,16 +181,16 @@ class EnvManager(Manager):
 		self.action_size = self.env.action_space.shape
 
 	def reset(self):
-		self.send_params([pickle.dumps({'cmd': 'RESET', 'item': [0.0]}) for _ in range(self.num_envs)], encoded=True)
+		self.send_params([pickle.dumps({"cmd": "RESET", "item": [0.0]}) for _ in range(self.num_envs)], encoded=True)
 		states = self.await_results(converter=pickle.loads, decoded=True)
 		return states
 
 	def step(self, actions, render=False):
-		self.send_params([pickle.dumps({'cmd': 'STEP', 'item': action, 'render': render}) for action in actions], encoded=True)
+		self.send_params([pickle.dumps({"cmd": "STEP", "item": action, "render": render}) for action in actions], encoded=True)
 		results = self.await_results(converter=pickle.loads, decoded=True)
 		states, rewards, dones, infos = map(np.stack, zip(*results))
 		return states, rewards, dones, infos
 
 	def close(self):
 		self.env.close()
-		self.send_params([pickle.dumps({'cmd': 'CLOSE', 'item': [0.0]}) for _ in range(self.num_envs)], encoded=True)
+		self.send_params([pickle.dumps({"cmd": "CLOSE", "item": [0.0]}) for _ in range(self.num_envs)], encoded=True)

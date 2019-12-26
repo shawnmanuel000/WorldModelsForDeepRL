@@ -62,7 +62,7 @@ def run(model, statemodel, runs=1, load_dir="", ports=16):
 		total_reward = 0
 		for _ in range(envs.env.spec.max_episode_steps):
 			env_actions, actions, states = agent.get_env_action(envs.env, states)
-			next_states, rewards, dones, _ = envs.step(env_actions, render=(ep%10==0))
+			next_states, rewards, dones, _ = envs.step(env_actions, render=(ep%runs==0))
 			agent.train(states, actions, next_states, rewards, dones)
 			total_reward += np.mean(rewards)
 			states = next_states
