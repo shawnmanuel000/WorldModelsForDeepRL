@@ -112,7 +112,7 @@ class PPOAgent(PTACAgent):
 			states, actions, log_probs, targets, advantages = [x.view(x.size(0)*x.size(1), *x.size()[2:]) for x in (states, actions, log_probs, targets, advantages)]
 			self.replay_buffer.clear().extend(zip(states, actions, log_probs, targets, advantages))
 			for _ in range(self.ppo_epochs):
-				# self.replay_buffer.reset_priorities()
+				self.replay_buffer.reset_priorities()
 				for _ in range(update_freq):
 					(state, action, log_prob, target, advantage), indices, importances = self.replay_buffer.sample(self.ppo_batch, dtype=torch.stack)
 					errors = self.network.optimize(state, action, log_prob, target, advantage, importances**(1-self.eps))
