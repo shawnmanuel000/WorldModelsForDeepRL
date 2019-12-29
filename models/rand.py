@@ -48,7 +48,8 @@ class ReplayBuffer():
 		self.buffer.append(experience)
 		return self
 
-	def extend(self, experiences):
+	def extend(self, experiences, shuffle=False):
+		if shuffle: random.shuffle(experiences)
 		for exp in experiences:
 			self.add(exp)
 		return self
@@ -63,6 +64,11 @@ class ReplayBuffer():
 		samples = itemgetter(*sample_indices)(self.buffer)
 		sample_arrays = samples if dtype is None else map(dtype, zip(*samples))
 		return sample_arrays, sample_indices, torch.Tensor([1])
+
+	def index(self, batch_size, index, dtype=np.array):
+		sample_indices = range(index, index+batch_size)
+		samples = itemgetter(*sample_indices)(self.buffer)
+		return map(dtype, zip(*samples))
 
 	def update_priorities(self, indices, errors, offset=0.1):
 		pass

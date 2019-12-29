@@ -4,17 +4,14 @@ import pickle
 import argparse
 import numpy as np
 from models.rand import ReplayBuffer, PrioritizedReplayBuffer
-from utils.network import PTACNetwork, PTACAgent, Conv, INPUT_LAYER, ACTOR_HIDDEN, CRITIC_HIDDEN, LEARN_RATE
+from utils.network import PTACNetwork, PTACAgent, Conv, INPUT_LAYER, ACTOR_HIDDEN, CRITIC_HIDDEN, LEARN_RATE, DISCOUNT_RATE, NUM_STEPS, ADVANTAGE_DECAY
 
-EPS_MIN = 0.2                 	# The lower limit proportion of random to greedy actions to take
-EPS_DECAY = 0.997             	# The rate at which eps decays from EPS_MAX to EPS_MIN
-BATCH_SIZE = 8					# Number of samples to train on for each train step
-PPO_EPOCHS = 8					# Number of iterations to sample batches for training
+EPS_MIN = 0.1                 	# The lower limit proportion of random to greedy actions to take
+EPS_DECAY = 0.995             	# The rate at which eps decays from EPS_MAX to EPS_MIN
+BATCH_SIZE = 4					# Number of samples to train on for each train step
+PPO_EPOCHS = 2					# Number of iterations to sample batches for training
 ENTROPY_WEIGHT = 0.005			# The weight for the entropy term of the Actor loss
-CLIP_PARAM = 0.005				# The limit of the ratio of new action probabilities to old probabilities
-DISCOUNT_RATE = 0.97			# The discount rate to use in the Bellman Equation
-NUM_STEPS = 40					# The number of steps to collect experience in sequence for each GAE calculation
-ADVANTAGE_DECAY = 0.99			# The discount factor for the cumulative GAE calculation
+CLIP_PARAM = 0.01				# The limit of the ratio of new action probabilities to old probabilities
 
 class PPOActor(torch.nn.Module):
 	def __init__(self, state_size, action_size):
@@ -68,7 +65,7 @@ class PPONetwork(PTACNetwork):
 			value = self.critic_local(state.to(self.device))
 			return value
 
-	def optimize(self, states, actions, old_log_probs, targets, advantages, importances=1, clip_param=CLIP_PARAM, e_weight=ENTROPY_WEIGHT, scale=1):
+	def optimize(self, states, actions, old_log_probs, targets, advantages, importances=torch.scalar_tensor(1), clip_param=CLIP_PARAM, e_weight=ENTROPY_WEIGHT, scale=1):
 		values = self.get_value(states)
 		critic_error = values - targets
 		critic_loss = importances.to(self.device) + critic_error.pow(2)
@@ -90,7 +87,6 @@ class PPONetwork(PTACNetwork):
 class PPOAgent(PTACAgent):
 	def __init__(self, state_size, action_size, decay=EPS_DECAY, lr=LEARN_RATE, update_freq=NUM_STEPS, gpu=True, load=None):
 		super().__init__(state_size, action_size, PPONetwork, lr=lr, update_freq=update_freq, decay=decay, gpu=gpu, load=load)
-		self.replay_buffer = PrioritizedReplayBuffer()
 		self.ppo_epochs = PPO_EPOCHS
 		self.ppo_batch = BATCH_SIZE
 
@@ -101,7 +97,7 @@ class PPOAgent(PTACAgent):
 
 	def train(self, state, action, next_state, reward, done):
 		self.buffer.append((state, self.action, self.log_prob, reward, done))
-		update_freq = int(self.update_freq * (1 - self.eps + EPS_MIN)**0.0)
+		update_freq = int(self.update_freq * (1 - self.eps + EPS_MIN)**2)
 		if len(self.buffer) >= update_freq:
 			states, actions, log_probs, rewards, dones = map(self.to_tensor, zip(*self.buffer))
 			self.buffer.clear()
@@ -109,12 +105,14 @@ class PPOAgent(PTACAgent):
 			values = self.network.get_value(states, grad=False)
 			next_value = self.network.get_value(next_state, grad=False)
 			targets, advantages = self.compute_gae(next_value, rewards.unsqueeze(-1), dones.unsqueeze(-1), values, gamma=DISCOUNT_RATE, lamda=ADVANTAGE_DECAY)
-			states, actions, log_probs, targets, advantages = [x.view(x.size(0)*x.size(1), *x.size()[2:]) for x in (states, actions, log_probs, targets, advantages)]
-			self.replay_buffer.clear().extend(zip(states, actions, log_probs, targets, advantages))
-			for _ in range(self.ppo_epochs):
-				self.replay_buffer.reset_priorities()
-				for _ in range(update_freq):
-					(state, action, log_prob, target, advantage), indices, importances = self.replay_buffer.sample(self.ppo_batch, dtype=torch.stack)
-					errors = self.network.optimize(state, action, log_prob, target, advantage, importances**(1-self.eps))
-					self.replay_buffer.update_priorities(indices, errors)
-		if done[0]: self.eps = max(self.eps * self.decay, EPS_MIN)
+			states, actions, log_probs, targets, advantages = [x.view(x.size(0)*x.size(1), *x.size()[2:]).cpu().numpy() for x in (states, actions, log_probs, targets, advantages)]
+			self.replay_buffer.extend(zip(states, actions, log_probs, targets, advantages))
+			# for _ in range(self.ppo_epochs):
+			# 	for i in range(0, len(self.replay_buffer), self.ppo_batch):
+			# 		state, action, log_prob, target, advantage = self.replay_buffer.index(self.ppo_batch, i, torch.stack)
+			# 		self.network.optimize(state, action, log_prob, target, advantage, e_weight=self.eps*ENTROPY_WEIGHT, scale=16*update_freq/len(self.replay_buffer))
+		if len(self.replay_buffer) > 0:
+			(states, actions, log_probs, targets, advantages), indices, importances = self.replay_buffer.sample(32, dtype=self.to_tensor)
+			errors = self.network.optimize(states, actions, log_probs, targets, advantages, importances**(1-self.eps))
+			self.replay_buffer.update_priorities(indices, errors)
+			if done[0]: self.eps = max(self.eps * self.decay, EPS_MIN)

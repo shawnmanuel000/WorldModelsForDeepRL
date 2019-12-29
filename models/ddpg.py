@@ -4,12 +4,11 @@ import torch
 import random
 import numpy as np
 from models.rand import RandomAgent, PrioritizedReplayBuffer, ReplayBuffer
-from utils.network import PTACNetwork, PTACAgent, Conv, INPUT_LAYER, ACTOR_HIDDEN, CRITIC_HIDDEN, LEARN_RATE
+from utils.network import PTACNetwork, PTACAgent, Conv, INPUT_LAYER, ACTOR_HIDDEN, CRITIC_HIDDEN, LEARN_RATE, NUM_STEPS
 
 EPS_MIN = 0.020               	# The lower limit proportion of random to greedy actions to take
 EPS_DECAY = 0.980             	# The rate at which eps decays from EPS_MAX to EPS_MIN
 REPLAY_BATCH_SIZE = 32        	# How many experience tuples to sample from the buffer for each train step
-NUM_STEPS = 1000				# The number of steps to collect experience in sequence for each GAE calculation
 
 class DDPGActor(torch.nn.Module):
 	def __init__(self, state_size, action_size):
