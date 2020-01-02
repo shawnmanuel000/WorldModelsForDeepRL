@@ -106,7 +106,7 @@ class DDPGAgent(PTACAgent):
 			next_value = self.network.get_q_value(next_state, next_action, use_target=True, numpy=False)
 			targets, advantages = self.compute_gae(next_value, rewards.unsqueeze(-1), dones.unsqueeze(-1), values)
 			states, actions, targets, advantages = [x.view(x.size(0)*x.size(1), *x.size()[2:]).cpu().numpy() for x in (states, actions, targets, advantages)]
-			self.replay_buffer.extend(zip(states, actions, targets, advantages))	
+			self.replay_buffer.extend(list(zip(states, actions, targets, advantages)), shuffle=True)	
 		if len(self.replay_buffer) > 0:
 			(states, actions, targets, advantages), indices, importances = self.replay_buffer.sample(REPLAY_BATCH_SIZE, dtype=self.to_tensor)
 			errors = self.network.optimize(states, actions, targets, importances**(1-self.eps))

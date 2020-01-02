@@ -2,8 +2,9 @@ models=([1]="ddpg" [2]="ppo")
 iternums=([1]="1") # [2]="0" [3]="-1")
 
 model=$1
-workers=16
 baseport=$2
+workers=16
+runs=500
 
 open_terminal()
 {
@@ -41,11 +42,6 @@ run()
 
 for iter in ${iternums[@]}
 do
-	runs=500
-	# if [ $model = "ddpg" ]
-	# then
-	# 	runs=500
-	# fi 
 	run $workers $runs $model $iter
 done
 

@@ -66,7 +66,7 @@ class ReplayBuffer():
 		return sample_arrays, sample_indices, torch.Tensor([1])
 
 	def index(self, batch_size, index, dtype=np.array):
-		sample_indices = range(index, index+batch_size)
+		sample_indices = range(index, min(index+batch_size, len(self.buffer)))
 		samples = itemgetter(*sample_indices)(self.buffer)
 		return map(dtype, zip(*samples))
 

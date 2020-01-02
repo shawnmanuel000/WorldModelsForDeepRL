@@ -25,13 +25,13 @@ def evaluate_best(runs=1, gpu=True, iternums=[-1, 0, 1]):
 	env.env.verbose = 0
 	for iternum in iternums:
 		dirname = "pytorch" if iternum < 0 else f"iter{iternum}/"
-		for model in [DDPGAgent]:#, PPOAgent]:
+		for model in [PPOAgent]:#, PPOAgent]:
 			statemodel = ImgStack if iternum < 0 else WorldModel
 			agent = WorldACAgent(env.action_space.shape, 1, model, statemodel, load=dirname, gpu=gpu, train=False)
 			# scores = [rollout(env, agent.reset(), eps=EPS_MIN, render=True) for _ in range(runs)]
 			scores = []
 			for ep in range(runs):
-				scores.append(rollout(env, agent.reset(), eps=EPS_MIN, render=False))
+				scores.append(rollout(env, agent.reset(), eps=EPS_MIN, sample=False, render=False))
 				print(f"   Ep: {ep}, Score: {scores[-1]}")
 			mean = np.mean(scores)
 			std = np.std(scores)
