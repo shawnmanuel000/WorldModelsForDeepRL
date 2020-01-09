@@ -6,7 +6,7 @@ import numpy as np
 from models.rand import RandomAgent, ReplayBuffer
 
 REG_LAMBDA = 1e-6             	# Penalty multiplier to apply for the size of the network weights
-LEARN_RATE = 0.0001           	# Sets how much we want to update the network weights at each training step
+LEARN_RATE = 0.0002           	# Sets how much we want to update the network weights at each training step
 TARGET_UPDATE_RATE = 0.0004   	# How frequently we want to copy the local network to the target network (for double DQNs)
 INPUT_LAYER = 512				# The number of output nodes from the first layer to Actor and Critic networks
 ACTOR_HIDDEN = 256				# The number of nodes in the hidden layers of the Actor network

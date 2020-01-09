@@ -65,9 +65,11 @@ class ReplayBuffer():
 		sample_arrays = samples if dtype is None else map(dtype, zip(*samples))
 		return sample_arrays, sample_indices, torch.Tensor([1])
 
-	def index(self, batch_size, index, dtype=np.array):
-		sample_indices = range(index, min(index+batch_size, len(self.buffer)))
+	def next_batch(self, batch_size=1, dtype=np.array):
+		if not hasattr(self, "i_batch"): self.i_batch = 0
+		sample_indices = [i%len(self.buffer) for i in range(self.i_batch, self.i_batch+batch_size)]
 		samples = itemgetter(*sample_indices)(self.buffer)
+		self.i_batch = (self.i_batch+batch_size) % len(self.buffer)
 		return map(dtype, zip(*samples))
 
 	def update_priorities(self, indices, errors, offset=0.1):

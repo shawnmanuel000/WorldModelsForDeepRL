@@ -4,15 +4,14 @@ import pickle
 import argparse
 import numpy as np
 from models.rand import ReplayBuffer, PrioritizedReplayBuffer
-from utils.network import PTACNetwork, PTACAgent, Conv, INPUT_LAYER, ACTOR_HIDDEN, CRITIC_HIDDEN, LEARN_RATE, DISCOUNT_RATE, ADVANTAGE_DECAY
+from utils.network import PTACNetwork, PTACAgent, Conv, INPUT_LAYER, ACTOR_HIDDEN, CRITIC_HIDDEN, LEARN_RATE, DISCOUNT_RATE, NUM_STEPS, ADVANTAGE_DECAY
 
-EPS_MIN = 0.020                	# The lower limit proportion of random to greedy actions to take
-EPS_DECAY = 0.980             	# The rate at which eps decays from EPS_MAX to EPS_MIN
+EPS_MIN = 0.1                	# The lower limit proportion of random to greedy actions to take
+EPS_DECAY = 0.997             	# The rate at which eps decays from EPS_MAX to EPS_MIN
 BATCH_SIZE = 32					# Number of samples to train on for each train step
-PPO_EPOCHS = 1					# Number of iterations to sample batches for training
+PPO_EPOCHS = 2					# Number of iterations to sample batches for training
 ENTROPY_WEIGHT = 0.005			# The weight for the entropy term of the Actor loss
-CLIP_PARAM = 0.025				# The limit of the ratio of new action probabilities to old probabilities
-NUM_STEPS = 1000  				# The number of steps to collect experience in sequence for each GAE calculation
+CLIP_PARAM = 0.1				# The limit of the ratio of new action probabilities to old probabilities
 
 class PPOActor(torch.nn.Module):
 	def __init__(self, state_size, action_size):
@@ -31,7 +30,7 @@ class PPOActor(torch.nn.Module):
 		action_mu = self.action_mu(state)
 		action_sig = self.action_sig.exp().expand_as(action_mu)
 		dist = torch.distributions.Normal(action_mu, action_sig)
-		action = action_mu if not sample else dist.sample() if action is None else action
+		action = dist.sample() if action is None else action
 		log_prob = dist.log_prob(action)
 		entropy = dist.entropy()
 		return action, log_prob, entropy
@@ -95,7 +94,7 @@ class PPOAgent(PTACAgent):
 
 	def train(self, state, action, next_state, reward, done):
 		self.buffer.append((state, self.action, self.log_prob, reward, done))
-		update_freq = int(self.update_freq * (1 - self.eps + EPS_MIN)**0.5)
+		update_freq = int(self.update_freq * (1 - self.eps + EPS_MIN)**2)
 		if len(self.buffer) >= update_freq:
 			states, actions, log_probs, rewards, dones = map(self.to_tensor, zip(*self.buffer))
 			self.buffer.clear()
@@ -105,8 +104,7 @@ class PPOAgent(PTACAgent):
 			targets, advantages = self.compute_gae(next_value, rewards.unsqueeze(-1), dones.unsqueeze(-1), values, gamma=DISCOUNT_RATE, lamda=ADVANTAGE_DECAY)
 			states, actions, log_probs, targets, advantages = [x.view(x.size(0)*x.size(1), *x.size()[2:]) for x in (states, actions, log_probs, targets, advantages)]
 			self.replay_buffer.clear().extend(list(zip(states, actions, log_probs, targets, advantages)), shuffle=True)
-			for _ in range(PPO_EPOCHS):
-				for i in range(0, len(self.replay_buffer), BATCH_SIZE):
-					state, action, log_prob, target, advantage = self.replay_buffer.index(BATCH_SIZE, i, torch.stack)
-					self.network.optimize(state, action, log_prob, target, advantage, scale=16*update_freq/len(self.replay_buffer))
+			for _ in range((len(self.replay_buffer)*PPO_EPOCHS)//BATCH_SIZE):
+				state, action, log_prob, target, advantage = self.replay_buffer.next_batch(BATCH_SIZE, torch.stack)
+				self.network.optimize(state, action, log_prob, target, advantage, scale=update_freq/len(self.replay_buffer))
 		if done[0]: self.eps = max(self.eps * self.decay, EPS_MIN)
