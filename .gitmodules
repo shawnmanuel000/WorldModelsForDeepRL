@@ -1,0 +1,3 @@
+[submodule "dependencies/ViZDoom"]
+	path = dependencies/ViZDoom
+	url = https://github.com/mwydmuch/ViZDoom.git

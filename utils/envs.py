@@ -12,10 +12,17 @@ from utils.misc import IMG_DIM
 FRAME_STACK = 2					# The number of consecutive image states to combine for training a3c on raw images
 NUM_ENVS = 16					# The default number of environments to simultaneously train the a3c in parallel
 
+def get_space_size(space):
+	if isinstance(space, gym.spaces.MultiDiscrete): return [*space.shape, space.nvec[0]]
+	if isinstance(space, gym.spaces.Discrete): return [space.n]
+	if isinstance(space, gym.spaces.Box): return space.shape
+	if isinstance(space, list): return [get_space_size(sp) for sp in space]
+	raise ValueError()
+
 class WorldModel():
 	def __init__(self, action_size, num_envs=1, load="", gpu=True):
 		self.vae = VAE(load=load, gpu=gpu)
-		self.mdrnn = MDRNNCell(load=load, gpu=gpu)
+		self.mdrnn = MDRNNCell(action_size, load=load, gpu=gpu)
 		self.transform = transforms.Compose([transforms.ToPILImage(), transforms.Resize((IMG_DIM, IMG_DIM)), transforms.ToTensor()])
 		self.state_size = [LATENT_SIZE + HIDDEN_SIZE]
 		self.hiddens = {}
@@ -66,8 +73,8 @@ class ImgStack():
 		return self
 
 class StackEnv():
-	def __init__(self, env_name, load_dir="pytorch", stack_len=FRAME_STACK, img=False):
-		self.env = gym.make(env_name)
+	def __init__(self, make_env, load_dir="pytorch", stack_len=FRAME_STACK, img=False):
+		self.env = make_env()
 		self.env.env.verbose = 0
 		self.stack_len = stack_len
 		self.img = img
@@ -115,13 +122,12 @@ class StackEnv():
 		self.env.close()
 
 class EnsembleEnv():
-	def __init__(self, env_name, num_envs=NUM_ENVS):
-		self.env = gym.make(env_name)
-		self.env.env.verbose = 0
-		self.envs = [gym.make(env_name) for _ in range(num_envs)]
-		self.state_size = self.envs[0].observation_space.shape
-		self.action_size = self.envs[0].action_space.shape
-		for env in self.envs: env.env.verbose = 0
+	def __init__(self, make_env, num_envs=NUM_ENVS):
+		self.env = make_env()
+		self.envs = [make_env() for _ in range(num_envs)]
+		self.state_size = get_space_size(self.env.observation_space)
+		self.action_size = get_space_size(self.env.action_space)
+		self.action_space = self.env.action_space
 
 	def reset(self):
 		states = [env.reset() for env in self.envs]
@@ -143,16 +149,15 @@ class EnsembleEnv():
 			env.close()
 
 class EnvWorker(Worker):
-	def __init__(self, self_port, env_name):
+	def __init__(self, self_port, make_env):
 		super().__init__(self_port)
-		self.env = gym.make(env_name)
-		self.env.env.verbose = 0
+		self.env = make_env()
 
 	def start(self):
 		step = 0
 		rewards = 0
 		while True:
-			data = pickle.loads(self.conn.recv(100000))
+			data = pickle.loads(self.conn.recv(1000000))
 			if data["cmd"] == "RESET":
 				message = self.env.reset()
 				rewards = 0
@@ -172,13 +177,13 @@ class EnvWorker(Worker):
 			self.conn.sendall(pickle.dumps(message))
 
 class EnvManager(Manager):
-	def __init__(self, env_name, client_ports):
+	def __init__(self, make_env, client_ports):
 		super().__init__(client_ports=client_ports)
 		self.num_envs = len(client_ports)
-		self.env = gym.make(env_name)
-		self.env.env.verbose = 0
-		self.state_size = self.env.observation_space.shape
-		self.action_size = self.env.action_space.shape
+		self.env = make_env()
+		self.state_size = get_space_size(self.env.observation_space)
+		self.action_size = get_space_size(self.env.action_space)
+		self.action_space = self.env.action_space
 
 	def reset(self):
 		self.send_params([pickle.dumps({"cmd": "RESET", "item": [0.0]}) for _ in range(self.num_envs)], encoded=True)

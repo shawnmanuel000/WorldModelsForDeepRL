@@ -9,9 +9,11 @@ import utils.misc as misc
 from models.controller import ControlAgent
 from models.rand import RandomAgent
 from data.loaders import ROOT
+from train_a3c import make_env, env_name
+import matplotlib.pyplot as plt
 
 parser = argparse.ArgumentParser(description="Rollout Generator")
-parser.add_argument("--nsamples", type=int, default=0, help="How many rollouts to save")
+parser.add_argument("--nsamples", type=int, default=1, help="How many rollouts to save")
 parser.add_argument("--iternum", type=int, default=0, choices=[0,1], help="Which iteration of trained World Model to load (0 or 1)")
 parser.add_argument("--datadir", type=str, default=ROOT, help="The directory path to save the sampled rollouts")
 args = parser.parse_args()
@@ -46,11 +48,11 @@ class RolloutCollector():
 
 def sample(runs, iternum, root=ROOT, number=None):
 	dirname = f"iter{iternum}/"
-	env = gym.make("CarRacing-v0")
-	env.env.verbose = 0
+	env = make_env()
 	os.makedirs(os.path.dirname(os.path.join(root, dirname)), exist_ok=True)
 	rollout = RolloutCollector(os.path.join(root, dirname))
-	agent = RandomAgent(env.action_space.shape) if iternum <= 0 else ControlAgent(env.action_space.shape, gpu=False, load=f"iter{iternum-1}/")
+	action_size = [env.action_space.n] if hasattr(env.action_space, 'n') else env.action_space.shape
+	agent = RandomAgent(action_size) if iternum <= 0 else ControlAgent(action_size=action_size, gpu=False, load=f"iter{iternum-1}/")
 	for ep in range(runs):
 		state = env.reset()
 		total_reward = 0
@@ -79,4 +81,4 @@ def check_samples(iternum, root=ROOT):
 if __name__ == "__main__":
 	if args.nsamples > 0:
 		sample(args.nsamples, args.iternum, args.datadir)
-	check_samples(args.iternum, args.datadir)
+	# check_samples(args.iternum, args.datadir)

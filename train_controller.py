@@ -10,6 +10,7 @@ from models.mdrnn import MDRNNCell, HIDDEN_SIZE, ACTION_SIZE
 from models.controller import Controller, ControlAgent
 from utils.multiprocess import Manager, Worker
 from utils.misc import rollout, IMG_DIM, Logger
+from train_a3c import make_env, env_name
 
 parser = argparse.ArgumentParser(description="Controller Trainer")
 parser.add_argument("--workerports", type=int, default=None, nargs="+", help="The list of worker ports to connect to")
@@ -17,13 +18,11 @@ parser.add_argument("--selfport", type=int, default=None, help="Which port to li
 parser.add_argument("--iternum", type=int, default=0, help="Which iteration of trained World Model to load")
 args = parser.parse_args()
 
-ENV_NAME = "CarRacing-v0"
-
 class ControllerWorker(Worker):
 	def start(self, load_dirname, gpu=True, iterations=1):
-		env = gym.make(ENV_NAME)
-		env.env.verbose = 0
-		agent = ControlAgent(env.action_space.shape, gpu=gpu, load=load_dirname)
+		env = make_env()
+		action_size = [env.action_space.n] if hasattr(env.action_space, 'n') else env.action_space.shape
+		agent = ControlAgent(action_size=action_size, gpu=gpu, load=load_dirname)
 		episode = 0
 		while True:
 			data = pickle.loads(self.conn.recv(100000))
@@ -46,9 +45,12 @@ class ControllerManager(Manager):
 		train(save_dirname, get_scores, epochs, popsize=popsize)
 
 def train(save_dirname, get_scores, epochs=250, popsize=4, restarts=1):
+	env = make_env()
+	action_size = [env.action_space.n] if hasattr(env.action_space, 'n') else env.action_space.shape
 	logger = Logger(Controller, save_dirname, popsize=popsize, restarts=restarts)
-	controller = Controller(gpu=False, load=False)
+	controller = Controller(action_size=action_size, gpu=False, load=False)
 	best_solution = (controller.get_params(), -np.inf)
+	total_scores = []
 	for run in range(restarts):
 		start_epochs = epochs//restarts
 		es = cma.CMAEvolutionStrategy(best_solution[0], 0.1, {"popsize": popsize})
@@ -56,27 +58,28 @@ def train(save_dirname, get_scores, epochs=250, popsize=4, restarts=1):
 			start_epochs -= 1
 			params = es.ask()
 			scores = get_scores(params)
+			total_scores.append(np.mean(scores))
 			es.tell(params, [-s for s in scores])
 			best_index = np.argmax(scores)
 			best_params = (params[best_index], scores[best_index])
 			if best_params[1] > best_solution[1]:
 				controller.set_params(best_params[0]).save_model(save_dirname)
 				best_solution = best_params
-			logger.log(f"Ep: {run}-{start_epochs}, Best score: {best_params[1]:3.4f}, Min: {np.min(scores):.4f}, Avg: {np.mean(scores):.4f}")
+			logger.log(f"Ep: {run}-{start_epochs}, Best score: {best_params[1]:3.4f}, Min: {np.min(scores):.4f}, Avg: {total_scores[-1]:.4f}, Rolling: {np.mean(total_scores):.4f}")
 
 def run(load_dirname, gpu=True, iterations=1):
-	env = gym.make(ENV_NAME)
-	env.env.verbose = 0
-	agent = ControlAgent(env.action_space.shape, gpu=gpu, load=load_dirname)
+	env = make_env()
+	action_size = [env.action_space.n] if hasattr(env.action_space, 'n') else env.action_space.shape
+	agent = ControlAgent(action_size, gpu=gpu, load=load_dirname)
 	get_scores = lambda params: [np.mean([rollout(env, agent.set_params(p)) for _ in range(iterations)]) for p in params]
 	train(load_dirname, get_scores, 1000)
 	env.close()
 
 if __name__ == "__main__":
-	dirname = "pytorch" if args.iternum < 0 else f"iter{args.iternum}/"
+	dirname = f"{env_name}/pytorch" if args.iternum < 0 else f"{env_name}/iter{args.iternum}/"
 	if args.selfport is not None:
-		ControllerWorker(args.selfport).start(dirname, gpu=True, iterations=5)
+		ControllerWorker(args.selfport).start(dirname, gpu=True, iterations=1)
 	elif args.workerports is not None:
-		ControllerManager(args.workerports).start(dirname, epochs=250, popsize=16)
+		ControllerManager(args.workerports).start(dirname, epochs=500, popsize=64)
 	else:
 		run(dirname, gpu=False)

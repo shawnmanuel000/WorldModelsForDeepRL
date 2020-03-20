@@ -9,7 +9,7 @@ from models.mdrnn import HIDDEN_SIZE, ACTION_SIZE
 class ControlActor(torch.nn.Module):
 	def __init__(self, state_size, action_size):
 		super().__init__()
-		self.linear = torch.nn.Linear(state_size[-1], *action_size)
+		self.linear = torch.nn.Linear(state_size[-1], action_size[-1])
 		self.apply(lambda m: torch.nn.init.xavier_normal_(m.weight) if type(m) == torch.nn.Linear else None)
 
 	def forward(self, state):

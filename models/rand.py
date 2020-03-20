@@ -1,3 +1,4 @@
+import gym
 import math
 import torch
 import random
@@ -32,10 +33,14 @@ class RandomAgent():
 
 	def get_env_action(self, env, state=None, eps=None, sample=True):
 		action = self.get_action(state, eps, sample)
-		action_normal = (1+action)/2
-		action_range = env.action_space.high - env.action_space.low
-		env_action = env.action_space.low + np.multiply(action_normal, action_range)
+		env_action = self.to_env_action(env.action_space, action)
 		return env_action, action
+
+	@staticmethod
+	def to_env_action(action_space, action):
+		if type(action_space) == list: return [RandomAgent.to_env_action(a_space, a) for a_space,a in zip(action_space, action)]
+		if type(action_space) in [gym.spaces.Discrete, gym.spaces.MultiDiscrete]: return np.argmax(action, -1)
+		return action_space.low + np.multiply((1+action)/2, action_space.high - action_space.low)
 
 	def train(self, state, action, next_state, reward, done):
 		if done: self.noise_process.reset()

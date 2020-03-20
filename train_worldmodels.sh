@@ -1,5 +1,5 @@
 startIter=0
-numIters=2
+numIters=1
 
 for i in `seq 0 $numIters` 
 do

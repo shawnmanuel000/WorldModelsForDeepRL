@@ -5,6 +5,7 @@ from torchvision import transforms
 from models.vae import VAE
 from utils.misc import IMG_DIM
 from data.loaders import RolloutObservationDataset, ROOT
+from train_a3c import env_name
 
 parser = argparse.ArgumentParser(description="VAE Trainer")
 parser.add_argument("--epochs", type=int, default=100, help="Number of epochs to train the VAE")
@@ -62,4 +63,4 @@ def run(epochs=250, checkpoint_dirname="pytorch"):
 		print(f"Ep: {ep+1} / {epochs}, Train: {ep_train_losses[-1]:.4f}, Test: {ep_test_losses[-1]:.4f}")
 		
 if __name__ == "__main__":
-	run(args.epochs, f"iter{args.iternum}")
+	run(args.epochs, f"{env_name}/iter{args.iternum}")

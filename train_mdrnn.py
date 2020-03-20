@@ -5,6 +5,7 @@ from torchvision import transforms
 from models.mdrnn import MDRNN
 from models.vae import VAE, LATENT_SIZE
 from data.loaders import RolloutSequenceDataset, ROOT
+from train_a3c import env_name, make_env
 
 parser = argparse.ArgumentParser(description="MDRNN Trainer")
 parser.add_argument("--epochs", type=int, default=50, help="Number of epochs to train the VAE")
@@ -49,9 +50,11 @@ def test_loop(test_loader, vae, mdrnn):
 	return np.sum(batch_losses) * BATCH_SIZE / len(test_loader.dataset)
 
 def run(epochs=50, checkpoint_dirname="pytorch"):
+	env = make_env()
+	action_size = [env.action_space.n] if hasattr(env.action_space, 'n') else env.action_space.shape
 	train_loader, test_loader = get_data_loaders()
 	vae = VAE().load_model(checkpoint_dirname)
-	mdrnn = MDRNN(load=False)
+	mdrnn = MDRNN(action_size=action_size, load=False)
 	ep_train_losses = []
 	ep_test_losses = []
 	for ep in range(epochs):
@@ -65,4 +68,4 @@ def run(epochs=50, checkpoint_dirname="pytorch"):
 		print(f"Ep: {ep+1} / {epochs}, Train: {ep_train_losses[-1]:.4f}, Test: {ep_test_losses[-1]:.4f}")
 		
 if __name__ == "__main__":
-	run(args.epochs, f"iter{args.iternum}")
+	run(args.epochs, f"{env_name}/iter{args.iternum}")

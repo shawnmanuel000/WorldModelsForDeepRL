@@ -50,7 +50,7 @@ class Manager():
 		responses = {}
 		for port, sock in self.client_sockets.items():
 			# data = sock.recv(100000)
-			responses[port] = converter(sock.recv(100000))
+			responses[port] = converter(sock.recv(1000000))
 		return [responses[port] for port in self.client_ports]
 
 	def __del__(self):

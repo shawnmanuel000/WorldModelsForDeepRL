@@ -1,5 +1,5 @@
 models=([1]="ddpg" [2]="ppo")
-iternums=([1]="1") # [2]="0" [3]="-1")
+iternums=([1]="-1") # [2]="0" [3]="1")
 
 model=$1
 baseport=$2
@@ -14,7 +14,7 @@ open_terminal()
 		tell app "Terminal" to do script "cd \"`pwd`\"; $script; exit"
 END
 	elif [[ "$OSTYPE" == "linux-gnu" ]]; then # Running on linux
-		xterm -display ":0" -e $script $2 # Add -hold argument after xterm to debug
+		xterm -e $script $2 # Add -hold argument after xterm to debug
 	fi
 }
 

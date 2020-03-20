@@ -4,8 +4,9 @@ import numpy as np
 from bisect import bisect
 from os.path import join, isdir
 from sklearn.model_selection import train_test_split
+from train_a3c import env_name
 
-ROOT = "/home/shawn/Documents/WorldModelsData/"
+ROOT = f"/home/shawn/Documents/WorldModelsData/{env_name}"
 
 def get_files(root):
     folders = []
