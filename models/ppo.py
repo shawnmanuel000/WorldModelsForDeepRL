@@ -11,7 +11,7 @@ EPS_DECAY = 0.997             	# The rate at which eps decays from EPS_MAX to EP
 BATCH_SIZE = 32					# Number of samples to train on for each train step
 PPO_EPOCHS = 2					# Number of iterations to sample batches for training
 ENTROPY_WEIGHT = 0.005			# The weight for the entropy term of the Actor loss
-CLIP_PARAM = 0.1				# The limit of the ratio of new action probabilities to old probabilities
+CLIP_PARAM = 0.05				# The limit of the ratio of new action probabilities to old probabilities
 
 class PPOActor(torch.nn.Module):
 	def __init__(self, state_size, action_size):
@@ -47,7 +47,7 @@ class PPOCritic(torch.nn.Module):
 	def forward(self, state):
 		state = self.layer1(state).relu()
 		state = self.layer2(state).relu()
-		state = self.layer3(state).relu() + state
+		state = self.layer3(state).relu()
 		value = self.value(state)
 		return value
 
@@ -73,8 +73,8 @@ class PPONetwork(PTACNetwork):
 		entropy, new_log_probs = self.get_action_probs(states, actions)
 		ratio = (new_log_probs - old_log_probs).exp()
 		ratio_clipped = torch.clamp(ratio, 1.0-clip_param, 1.0+clip_param)
-		actor_loss = -(torch.min(ratio*advantages, ratio_clipped*advantages).mean() + e_weight*entropy) * scale
-		self.step(self.actor_optimizer, actor_loss)
+		actor_loss = -(torch.min(ratio*advantages, ratio_clipped*advantages) + e_weight*entropy) * scale
+		self.step(self.actor_optimizer, actor_loss.mean())
 		return critic_error.cpu().detach().numpy().squeeze(-1)
 
 	def save_model(self, dirname="pytorch", name="best"):
@@ -106,5 +106,5 @@ class PPOAgent(PTACAgent):
 			self.replay_buffer.clear().extend(list(zip(states, actions, log_probs, targets, advantages)), shuffle=True)
 			for _ in range((len(self.replay_buffer)*PPO_EPOCHS)//BATCH_SIZE):
 				state, action, log_prob, target, advantage = self.replay_buffer.next_batch(BATCH_SIZE, torch.stack)
-				self.network.optimize(state, action, log_prob, target, advantage, scale=update_freq/len(self.replay_buffer))
+				self.network.optimize(state, action, log_prob, target, advantage, scale=8*update_freq/len(self.replay_buffer))
 		if done[0]: self.eps = max(self.eps * self.decay, EPS_MIN)
