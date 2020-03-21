@@ -14,6 +14,7 @@ from dependencies import VizDoomEnv
 
 # env_name = "CarRacing-v0"
 env_name = "take_cover"
+# env_name = "defend_the_center"
 
 def make_env():
 	if "-v" in env_name:
