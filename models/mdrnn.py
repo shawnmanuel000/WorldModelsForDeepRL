@@ -7,20 +7,21 @@ from torchvision import transforms
 from models.vae import LATENT_SIZE
 from utils.network import one_hot_from_indices
 
-ACTION_SIZE = 3					# The number of continuous action values required by the CarRacing-v0 environment
+ACTION_SIZE = None					# The number of continuous action values required by the CarRacing-v0 environment
 HIDDEN_SIZE = 256				# The number of nodes in the hidden layer output by the MDRNN
 N_GAUSS = 5						# The number of Gaussian parameters to output for the mixture of Gaussians
 LEARNING_RATE = 0.001			# Sets how much we want to update the network weights at each training step
 ALPHA = 0.9						# The decay rate of the learning rate
 
 class MDRNN(torch.nn.Module):
-	def __init__(self, action_size=[ACTION_SIZE], latent_size=LATENT_SIZE, hidden_size=HIDDEN_SIZE, n_gauss=N_GAUSS, load="", gpu=True):
+	def __init__(self, action_size, latent_size=LATENT_SIZE, hidden_size=HIDDEN_SIZE, n_gauss=N_GAUSS, load="", gpu=True):
 		super().__init__()
 		self.device = torch.device('cuda' if gpu and torch.cuda.is_available() else 'cpu')
 		self.action_size = action_size
 		self.latent_size = latent_size
 		self.hidden_size = hidden_size
 		self.n_gauss = n_gauss
+		self.discrete = type(self.action_size) == list
 		self.lstm = torch.nn.LSTM(action_size[-1] + latent_size, hidden_size).to(self.device)
 		self.gmm = torch.nn.Linear(hidden_size, (2*latent_size+1)*n_gauss + 2).to(self.device)
 		self.optimizer = torch.optim.RMSprop(self.parameters(), lr=LEARNING_RATE, alpha=ALPHA)
@@ -28,7 +29,7 @@ class MDRNN(torch.nn.Module):
 		if load: self.load_model(load)
 
 	def forward(self, actions, latents):
-		actions = one_hot_from_indices(actions, 2)
+		if self.discrete: actions = one_hot_from_indices(actions, 2)
 		lstm_inputs = torch.cat([actions, latents], dim=-1)
 		lstm_hiddens, _ = self.lstm(lstm_inputs)
 		gmm_outputs = self.gmm(lstm_hiddens)
@@ -84,10 +85,12 @@ class MDRNN(torch.nn.Module):
 		return self
 
 class MDRNNCell(torch.nn.Module):
-	def __init__(self, action_size=[ACTION_SIZE], latent_size=LATENT_SIZE, hidden_size=HIDDEN_SIZE, n_gauss=N_GAUSS, load="", gpu=True):
+	def __init__(self, action_size, latent_size=LATENT_SIZE, hidden_size=HIDDEN_SIZE, n_gauss=N_GAUSS, load="", gpu=True):
 		super().__init__()
 		self.n_gauss = N_GAUSS
+		self.action_size = action_size
 		self.latent_size = latent_size
+		self.discrete = type(self.action_size) == list
 		self.device = torch.device('cuda' if gpu and torch.cuda.is_available() else 'cpu')
 		self.lstm = torch.nn.LSTMCell(action_size[-1] + latent_size, hidden_size).to(self.device)
 		self.gmm = torch.nn.Linear(hidden_size, (2*latent_size+1)*n_gauss + 2).to(self.device)
@@ -96,7 +99,7 @@ class MDRNNCell(torch.nn.Module):
 	def forward(self, actions, latents, hiddens):
 		with torch.no_grad():
 			actions, latents = [x.to(self.device) for x in (torch.from_numpy(actions), latents)]
-			actions = one_hot_from_indices(actions, 2, keepdims=True)
+			if self.discrete: actions = one_hot_from_indices(actions, 2, keepdims=True)
 			lstm_inputs = torch.cat([actions, latents], dim=-1)
 			lstm_hidden = self.lstm(lstm_inputs, hiddens)
 			return lstm_hidden

@@ -66,7 +66,7 @@ def from_env(env, env_action):
 def rollout(env, agent, eps=None, render=False, sample=False, log_dir=None):
 	state = env.reset()
 	total_reward = None
-	done = False
+	done = None
 	with torch.no_grad():
 		while not np.all(done):
 			if render: env.render()
@@ -74,7 +74,7 @@ def rollout(env, agent, eps=None, render=False, sample=False, log_dir=None):
 			state, reward, ndone, _ = env.step(env_action)
 			reward = np.array(reward) if type(reward) == list else reward
 			total_reward = reward if total_reward is None else total_reward + reward
-			done = [d or n for d,n in zip(done, ndone)] if type(ndone)==type(done) and type(ndone) in [list, np.ndarray] else ndone
+			done = np.array(ndone) if done is None else np.logical_or(done, ndone)
 	return total_reward
 
 LOG_DIR = "logs"

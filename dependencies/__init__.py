@@ -7,10 +7,6 @@ import vizdoom as vzd
 
 IMG_DIM = 96					# The height and width to scale the environment image to
 
-def rgb2gray(image):
-	gray = np.dot(image, [0.299, 0.587, 0.114]).astype(np.float32)
-	return gray
-
 def resize(image, dim=IMG_DIM):
 	img = cv2.resize(image, dsize=(dim,dim), interpolation=cv2.INTER_CUBIC)
 	return img
@@ -18,7 +14,7 @@ def resize(image, dim=IMG_DIM):
 configs = sorted([s.replace(".cfg","") for s in sorted(os.listdir("./dependencies/ViZDoom/scenarios/")) if s.endswith(".cfg")])
 
 class VizDoomEnv():
-	def __init__(self, env_name, resize=IMG_DIM, transpose=[1,2,0]):
+	def __init__(self, env_name, resize=IMG_DIM, transpose=[1,2,0], render=True):
 		self.transpose = transpose
 		self.env = vzd.DoomGame()
 		self.env.load_config(os.path.abspath(f"./dependencies/ViZDoom/scenarios/{env_name}.cfg"))
@@ -26,22 +22,25 @@ class VizDoomEnv():
 		self.size = [self.env.get_screen_channels()] + ([resize, resize] if resize else [self.env.get_screen_height(), self.env.get_screen_width()])
 		self.sizet = [self.size[x] for x in transpose] if self.transpose else self.size
 		self.observation_space = gym.spaces.Box(0,255,shape=self.sizet)
-		self.env.set_window_visible(False)
+		self.env.set_window_visible(render)
 		self.env.init()
 
 	def reset(self):
+		self.time = 0
+		self.done = False
 		self.env.new_episode()
 		state = self.env.get_state().screen_buffer
 		if self.transpose: state = np.transpose(state, self.transpose)
 		return resize(state.astype(np.uint8))
 
 	def step(self, action):
+		self.time += 1
 		action_oh = self.one_hot(action)
 		reward = self.env.make_action(action_oh)
-		done = self.env.is_episode_finished()
-		state = np.zeros(self.size) if done else self.env.get_state().screen_buffer
+		self.done = self.env.is_episode_finished() or self.done
+		state = np.zeros(self.size) if self.done else self.env.get_state().screen_buffer
 		if self.transpose: state = np.transpose(state, self.transpose)
-		return resize(state.astype(np.uint8)), reward, done, None
+		return resize(state.astype(np.uint8)), reward, self.done, None
 
 	def render(self):
 		pass

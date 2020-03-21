@@ -12,9 +12,14 @@ from utils.envs import EnsembleEnv, EnvManager, EnvWorker, WorldModel, ImgStack
 from utils.misc import Logger, rollout
 from dependencies import VizDoomEnv
 
-# env_name = "CarRacing-v0"
-env_name = "take_cover"
+# env_name = "basic"
+# env_name = "my_way_home"
+# env_name = "health_gathering"
+# env_name = "predict_position"
 # env_name = "defend_the_center"
+# env_name = "defend_the_line"
+# env_name = "take_cover"
+env_name = "CarRacing-v0"
 
 def make_env():
 	if "-v" in env_name:

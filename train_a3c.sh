@@ -1,8 +1,9 @@
 models=([1]="ddpg" [2]="ppo")
 iternums=([1]="-1") # [2]="0" [3]="1")
 
-model=$1
-baseport=$2
+iter=$1
+model=$2
+baseport=$3
 workers=16
 runs=500
 
@@ -37,11 +38,11 @@ run()
 
 	sleep 4
 	port_string=$( IFS=$' '; echo "${ports[*]}" )
-	open_terminal "python3 -B train_a3c.py --runs $runs --model $agent --iternum $iterNum --workerports $port_string"
+	python3 -B train_a3c.py --runs $runs --model $agent --iternum $iterNum --workerports $port_string
 }
 
-for iter in ${iternums[@]}
-do
-	run $workers $runs $model $iter
-done
+# for iter in ${iternums[@]}
+# do
+# done
+run $workers $runs $model $iter
 
