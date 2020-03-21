@@ -33,18 +33,6 @@ def show_image(img, filename="test.png", save=True):
 	plt.imshow(img, cmap=plt.get_cmap('gray'))
 	plt.show()
 
-def load_other(gpu=True):
-	vae_file, rnn_file = [os.path.join("./logs", m, 'best.tar') for m in ['vae', 'mdrnn']]
-	assert os.path.exists(vae_file) and os.path.exists(rnn_file), "Either vae or mdrnn is untrained."
-	vae_state, rnn_state = [torch.load(fname, map_location=torch.device("cpu")) for fname in (vae_file, rnn_file)]
-	vae = VAE(gpu=gpu)
-	mdrnn = MDRNNCell(gpu=gpu)
-	vae.load_state_dict(vae_state['state_dict'])
-	mdrnn.load_state_dict({k.replace('rnn','lstm').replace('_linear','').replace('_l0',''): v for k, v in rnn_state['state_dict'].items()})
-	for m, s in (('VAE', vae_state), ('MDRNN', rnn_state)):
-		print("Loaded {} at epoch {} with test loss {}".format(m, s['epoch'], s['precision']))
-	return vae, mdrnn
-
 def make_video(imgs, dim, filename):
 	video = cv2.VideoWriter(filename, 0, 60, dim)
 	for img in imgs:

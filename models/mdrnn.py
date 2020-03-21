@@ -21,7 +21,7 @@ class MDRNN(torch.nn.Module):
 		self.latent_size = latent_size
 		self.hidden_size = hidden_size
 		self.n_gauss = n_gauss
-		self.discrete = type(self.action_size) == list
+		self.discrete = type(self.action_size) != tuple
 		self.lstm = torch.nn.LSTM(action_size[-1] + latent_size, hidden_size).to(self.device)
 		self.gmm = torch.nn.Linear(hidden_size, (2*latent_size+1)*n_gauss + 2).to(self.device)
 		self.optimizer = torch.optim.RMSprop(self.parameters(), lr=LEARNING_RATE, alpha=ALPHA)

@@ -1,5 +1,5 @@
 models=([1]="ddpg" [2]="ppo")
-iternums=([1]="-1") # [2]="0" [3]="1")
+iternums=([1]="-1") [2]="0" [3]="1")
 
 iter=$1
 model=$2
@@ -41,8 +41,5 @@ run()
 	python3 -B train_a3c.py --runs $runs --model $agent --iternum $iterNum --workerports $port_string
 }
 
-# for iter in ${iternums[@]}
-# do
-# done
 run $workers $runs $model $iter
 

@@ -8,9 +8,14 @@ from collections import deque
 from models.ppo import PPOAgent
 from models.rand import RandomAgent
 from models.ddpg import DDPGAgent, EPS_MIN
-from utils.envs import EnsembleEnv, EnvManager, EnvWorker, WorldModel, ImgStack
+from utils.wrappers import WorldACAgent
+from utils.multiprocess import set_rank_size
+from utils.envs import EnsembleEnv, EnvManager, EnvWorker, GymEnv
 from utils.misc import Logger, rollout
 from dependencies import VizDoomEnv
+
+TRIAL_AT = 1000
+SAVE_AT = 1
 
 # env_name = "basic"
 # env_name = "my_way_home"
@@ -19,7 +24,12 @@ from dependencies import VizDoomEnv
 # env_name = "defend_the_center"
 # env_name = "defend_the_line"
 # env_name = "take_cover"
-env_name = "CarRacing-v0"
+env_names = ["defend_the_line", "take_cover", "CarRacing-v0"]
+env_name = env_names[-1]
+models = {"ppo":PPOAgent, "ddpg":DDPGAgent}
+
+env_name = "CartPole-v0"
+# env_name = "Pendulum-v0"
 
 def make_env():
 	if "-v" in env_name:
@@ -27,63 +37,28 @@ def make_env():
 		env.env.verbose = 0
 	else:
 		env = VizDoomEnv(env_name)
-	return env
+	return GymEnv(env)
 
-class WorldACAgent(RandomAgent):
-	def __init__(self, action_size, num_envs, acagent, statemodel=WorldModel, load="", gpu=True, train=True):
-		super().__init__(action_size)
-		self.world_model = statemodel(action_size, num_envs, load=load, gpu=gpu)
-		self.acagent = acagent(self.world_model.state_size, action_size, load="" if train else load, gpu=gpu)
-
-	def get_env_action(self, env, state, eps=None, sample=True):
-		state, latent = self.world_model.get_state(state)
-		env_action, action = self.acagent.get_env_action(env, state, eps, sample)
-		self.world_model.step(latent, env_action)
-		return env_action, action, state
-
-	def train(self, state, action, next_state, reward, done):
-		next_state = self.world_model.get_state(next_state)[0]
-		self.acagent.train(state, action, next_state, reward, done)
-
-	def reset(self, num_envs=None):
-		num_envs = self.world_model.num_envs if num_envs is None else num_envs
-		self.world_model.reset(num_envs, restore=False)
-		return self
-
-	def save_model(self, dirname="pytorch", name="best"):
-		self.acagent.network.save_model(dirname, name)
-
-	def load(self, dirname="pytorch", name="best"):
-		self.world_model.load_model(dirname, name)
-		self.acagent.network.load_model(dirname, name)
-		return self
-
-def run(model, statemodel, runs=1, load_dir="", ports=16, render=False):
-	num_envs = len(ports) if type(ports) == list else min(ports, 16)
-	logger = Logger(model, load_dir, statemodel=statemodel, num_envs=num_envs)
-	envs = EnvManager(make_env, ports) if type(ports) == list else EnsembleEnv(make_env, ports)
-	agent = WorldACAgent(envs.action_size, num_envs, model, statemodel, load=load_dir)
+def train(make_env, model, ports, steps, checkpoint=None, save_best=False, log=True, render=False):
+	envs = (EnvManager if len(ports)>0 else EnsembleEnv)(make_env, ports)
+	agent = WorldACAgent(envs.state_size, envs.action_size, model, envs.num_envs, load="", gpu=True, worldmodel=True) 
+	logger = Logger(model, checkpoint, num_envs=envs.num_envs, state_size=agent.state_size, action_size=envs.action_size, action_space=envs.env.action_space, envs=type(envs))
+	states = envs.reset(train=True)
 	total_rewards = []
-	for ep in range(runs):
-		states = envs.reset()
-		agent.reset(num_envs)
-		total_reward = 0
-		for _ in range(1000):
-			env_actions, actions, states = agent.get_env_action(envs.env, states)
-			next_states, rewards, dones, _ = envs.step(env_actions, render=(ep%runs==0))
-			agent.train(states, actions, next_states, rewards, dones)
-			total_reward += np.mean(rewards)
-			states = next_states
-		rollouts = rollout(envs, agent, render=render)
-		test_reward = np.mean(rollouts)
-		total_rewards.append(test_reward)
-		agent.save_model(load_dir, "checkpoint")
-		if total_rewards[-1] >= max(total_rewards): agent.save_model(load_dir)
-		logger.log(f"Ep: {ep:7d}, Reward: {total_rewards[-1]} [{np.std(rollouts):4.3f}], Avg: {np.mean(total_rewards, axis=0)} ({agent.acagent.eps:.4f})")
+	for s in range(steps+1):
+		env_actions, actions, states = agent.get_env_action(envs.env, states)
+		next_states, rewards, dones, _ = envs.step(env_actions, train=True)
+		agent.train(states, actions, next_states, rewards, dones)
+		states = next_states
+		if s%TRIAL_AT==0:
+			rollouts = rollout(envs, agent, render=render)
+			total_rewards.append(np.round(np.mean(rollouts, axis=-1), 3))
+			if checkpoint and len(total_rewards)%SAVE_AT==0: agent.save_model(checkpoint)
+			if checkpoint and save_best and np.all(total_rewards[-1] >= np.max(total_rewards, axis=-1)): agent.save_model(checkpoint, "best")
+			if log: logger.log(f"Step: {s:7d}, Reward: {total_rewards[-1]} [{np.std(rollouts):4.3f}], Avg: {np.mean(total_rewards, axis=0)} ({agent.eps:.4f})")
 	envs.close()
 
-def trial(model, steps=40000, ports=16):
-	# env_name = "Pendulum-v0"
+def trial(make_env, model, steps=40000, ports=4):
 	envs = EnvManager(make_env, ports) if type(ports) == list else EnsembleEnv(make_env, ports)
 	agent = model(envs.state_size, envs.action_size, decay=0.99)
 	env = make_env()
@@ -102,26 +77,27 @@ def trial(model, steps=40000, ports=16):
 	env.close()
 	envs.close()
 
-def parse_args():
+def parse_args(envs, models):
 	parser = argparse.ArgumentParser(description="A3C Trainer")
-	parser.add_argument("--workerports", type=int, default=[2], nargs="+", help="The list of worker ports to connect to")
-	parser.add_argument("--selfport", type=int, default=None, help="Which port to listen on (as a worker server)")
+	parser.add_argument("--model", type=str, default="ppo", choices=models, help="Which RL algorithm to use. Allowed values are:\n"+', '.join(models), metavar="model")
 	parser.add_argument("--iternum", type=int, default=-1, choices=[-1,0,1], help="Whether to train using World Model to load (0 or 1) or raw images (-1)")
-	parser.add_argument("--model", type=str, default="ppo", choices=["ddpg", "ppo"], help="Which reinforcement learning algorithm to use")
-	parser.add_argument("--runs", type=int, default=1, help="Number of episodes to train the agent")
+	parser.add_argument("--env_name", type=str, default=env_name, choices=envs, help="Name of the environment to use. Allowed values are:\n"+', '.join(envs), metavar="env_name")
+	parser.add_argument("--tcp_ports", type=int, default=[], nargs="+", help="The list of worker ports to connect to")
+	parser.add_argument("--tcp_rank", type=int, default=0, help="Which port to listen on (as a worker server)")
+	parser.add_argument("--render", action="store_true", help="Whether to render an environment rollout")
 	parser.add_argument("--trial", action="store_true", help="Whether to show a trial run training on the Pendulum-v0 environment")
+	parser.add_argument("--steps", type=int, default=100000, help="Number of steps to train the agent")
 	args = parser.parse_args()
 	return args
 
 if __name__ == "__main__":
-	args = parse_args()
-	dirname = f"{env_name}/pytorch" if args.iternum < 0 else f"{env_name}/iter{args.iternum}/"
-	state = ImgStack if args.iternum < 0 else WorldModel
-	model = PPOAgent if args.model == "ppo" else DDPGAgent
-	if args.trial:
-		trial(model, ports=args.workerports[0])
-	elif args.selfport is not None:
-		EnvWorker(args.selfport, make_env).start()
+	args = parse_args(env_names, models.keys())
+	checkpoint = f"{env_name}/pytorch" if args.iternum < 0 else f"{env_name}/iter{args.iternum}/"
+	rank, size = set_rank_size(args.tcp_rank, args.tcp_ports)
+	model = models[args.model]
+	if rank>0:
+		EnvWorker(make_env=make_env).start()
+	elif args.trial:
+		trial(make_env=make_env, model=model)
 	else:
-		if len(args.workerports) == 1: args.workerports = args.workerports[0]
-		run(model, state, args.runs, dirname, args.workerports)
+		train(make_env=make_env, model=model, ports=list(range(1,size)), steps=args.steps, checkpoint=checkpoint, render=args.render)
