@@ -2,10 +2,10 @@ import torch
 import argparse
 import numpy as np
 from torchvision import transforms
-from models.vae import VAE
-from utils.misc import IMG_DIM
 from data.loaders import RolloutObservationDataset, ROOT
+from utils.misc import IMG_DIM
 from train_a3c import env_name
+from models.worldmodel.vae import VAE
 
 parser = argparse.ArgumentParser(description="VAE Trainer")
 parser.add_argument("--epochs", type=int, default=100, help="Number of epochs to train the VAE")

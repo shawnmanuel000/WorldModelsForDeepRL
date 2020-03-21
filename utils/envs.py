@@ -44,7 +44,7 @@ class EnsembleEnv():
 		envs = self.envs if train else self.test_envs
 		for env,action in zip(envs, actions):
 			state, rew, done, info = env.step(action, train)
-			state = env.reset() if train and np.all(done) else state
+			state = env.reset() if train and done else state
 			results.append((state, rew, done, info))
 			if render: env.render()
 		obs, rews, dones, infos = zip(*results)
@@ -60,33 +60,6 @@ class EnsembleEnv():
 
 	def __del__(self):
 		self.close()
-
-# class EnsembleEnv():
-# 	def __init__(self, make_env, num_envs=NUM_ENVS):
-# 		self.env = make_env()
-# 		self.envs = [make_env() for _ in range(num_envs)]
-# 		self.state_size = get_space_size(self.env.observation_space)
-# 		self.action_size = get_space_size(self.env.action_space)
-# 		self.action_space = self.env.action_space
-
-# 	def reset(self):
-# 		states = [env.reset() for env in self.envs]
-# 		return np.stack(states)
-
-# 	def step(self, actions, render=False):
-# 		results = []
-# 		for env,action in zip(self.envs, actions):
-# 			ob, rew, done, info = env.step(action)
-# 			ob = env.reset() if done else ob
-# 			results.append((ob, rew, done, info))
-# 			if render: env.render()
-# 		obs, rews, dones, infos = zip(*results)
-# 		return np.stack(obs), np.stack(rews), np.stack(dones), infos
-
-# 	def close(self):
-# 		self.env.close()
-# 		for env in self.envs:
-# 			env.close()
 
 class EnvWorker():
 	def __init__(self, make_env, root=0):
@@ -105,7 +78,7 @@ class EnvWorker():
 				rewards[int(train)] = None
 			elif data["cmd"] == "STEP":
 				state, reward, done, info = env.step(data["item"], train)
-				state = env.reset() if train and np.all(done) else state
+				state = env.reset() if train and done else state
 				rewards[int(train)] = np.array(reward) if rewards[int(train)] is None else rewards[int(train)] + np.array(reward)
 				message = (state, reward, done, info)
 				step += int(train)
@@ -119,34 +92,6 @@ class EnvWorker():
 				[env.close() for env in self.env]
 				return
 			self.conn.send(message)
-
-# class EnvWorker(Worker):
-# 	def __init__(self, self_port, make_env):
-# 		super().__init__(self_port)
-# 		self.env = make_env()
-
-# 	def start(self):
-# 		step = 0
-# 		rewards = 0
-# 		while True:
-# 			data = pickle.loads(self.conn.recv(1000000))
-# 			if data["cmd"] == "RESET":
-# 				message = self.env.reset()
-# 				rewards = 0
-# 			elif data["cmd"] == "STEP":
-# 				state, reward, done, info = self.env.step(data["item"])
-# 				state = self.env.reset() if done else state
-# 				rewards += reward
-# 				step += 1
-# 				message = (state, reward, done, info)
-# 				if data["render"]: self.env.render()
-# 				if done: 
-# 					print(f"Step: {step}, Reward: {rewards}")
-# 					rewards = 0
-# 			elif data["cmd"] == "CLOSE":
-# 				self.env.close()
-# 				return
-# 			self.conn.sendall(pickle.dumps(message))
 
 class EnvManager():
 	def __init__(self, make_env, server_ports):
@@ -178,27 +123,3 @@ class EnvManager():
 
 	def __del__(self):
 		self.close()
-
-# class EnvManager(Manager):
-# 	def __init__(self, make_env, client_ports):
-# 		super().__init__(client_ports=client_ports)
-# 		self.num_envs = len(client_ports)
-# 		self.env = make_env()
-# 		self.state_size = get_space_size(self.env.observation_space)
-# 		self.action_size = get_space_size(self.env.action_space)
-# 		self.action_space = self.env.action_space
-
-# 	def reset(self):
-# 		self.send_params([pickle.dumps({"cmd": "RESET", "item": [0.0]}) for _ in range(self.num_envs)], encoded=True)
-# 		states = self.await_results(converter=pickle.loads, decoded=True)
-# 		return states
-
-# 	def step(self, actions, render=False):
-# 		self.send_params([pickle.dumps({"cmd": "STEP", "item": action, "render": render}) for action in actions], encoded=True)
-# 		results = self.await_results(converter=pickle.loads, decoded=True)
-# 		states, rewards, dones, infos = map(np.stack, zip(*results))
-# 		return states, rewards, dones, infos
-
-# 	def close(self):
-# 		self.env.close()
-# 		self.send_params([pickle.dumps({"cmd": "CLOSE", "item": [0.0]}) for _ in range(self.num_envs)], encoded=True)

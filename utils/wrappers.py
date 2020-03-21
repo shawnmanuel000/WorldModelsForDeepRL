@@ -2,9 +2,9 @@ import torch
 import numpy as np
 from collections import deque
 from torchvision import transforms
-from models.rand import RandomAgent
-from models.vae import VAE, LATENT_SIZE
-from models.mdrnn import MDRNNCell, HIDDEN_SIZE
+from models.worldmodel.vae import VAE, LATENT_SIZE
+from models.worldmodel.mdrnn import MDRNNCell, HIDDEN_SIZE
+from utils.rand import RandomAgent
 from utils.misc import IMG_DIM
 
 FRAME_STACK = 2					# The number of consecutive image states to combine for training a3c on raw images

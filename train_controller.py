@@ -5,9 +5,9 @@ import argparse
 import numpy as np
 import socket as Socket
 from torchvision import transforms
-from models.vae import VAE, LATENT_SIZE
-from models.mdrnn import MDRNNCell, HIDDEN_SIZE, ACTION_SIZE
-from models.controller import Controller, ControlAgent
+from models.worldmodel.vae import VAE, LATENT_SIZE
+from models.worldmodel.mdrnn import MDRNNCell, HIDDEN_SIZE, ACTION_SIZE
+from models.worldmodel.controller import Controller, ControlAgent
 from utils.multiprocess import Manager, Worker
 from utils.misc import rollout, IMG_DIM, Logger
 from train_a3c import make_env, env_name

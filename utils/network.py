@@ -4,7 +4,7 @@ import torch
 import random
 import inspect
 import numpy as np
-from models.rand import RandomAgent, ReplayBuffer
+from utils.rand import RandomAgent, ReplayBuffer
 
 REG_LAMBDA = 1e-6             	# Penalty multiplier to apply for the size of the network weights
 LEARN_RATE = 0.0001           	# Sets how much we want to update the network weights at each training step
@@ -98,9 +98,10 @@ class PTNetwork():
 		if param_norm is not None: torch.nn.utils.clip_grad_norm_(param_norm, 0.5)
 		optimizer.step()
 
-	def soft_copy(self, local, target):
+	def soft_copy(self, local, target, tau=None):
+		tau = self.tau if tau is None else tau
 		for t,l in zip(target.parameters(), local.parameters()):
-			t.data.copy_(t.data + self.tau*(l.data - t.data))
+			t.data.copy_(t.data + tau*(l.data - t.data))
 
 	def get_checkpoint_path(self, dirname="pytorch", name="checkpoint", net=None):
 		filepath = os.path.join(SAVE_DIR, self.name if net is None else net, dirname, f"{name}.pth")
@@ -139,52 +140,10 @@ class PTACNetwork(PTNetwork):
 			except:
 				print(f"WARN: Error loading model from {filepath}")
 
-# class PTACNetwork():
-# 	def __init__(self, state_size, action_size, actor=PTActor, critic=PTCritic, lr=LEARN_RATE, tau=TARGET_UPDATE_RATE, gpu=True, load=""): 
-# 		self.tau = tau
-# 		self.device = torch.device('cuda' if gpu and torch.cuda.is_available() else 'cpu')
-# 		self.actor_local = actor(state_size, action_size).to(self.device)
-# 		self.actor_target = actor(state_size, action_size).to(self.device)
-# 		self.actor_optimizer = torch.optim.Adam(self.actor_local.parameters(), lr=lr, weight_decay=REG_LAMBDA)
-		
-# 		self.critic_local = critic(state_size, action_size).to(self.device)
-# 		self.critic_target = critic(state_size, action_size).to(self.device)
-# 		self.critic_optimizer = torch.optim.Adam(self.critic_local.parameters(), lr=lr, weight_decay=REG_LAMBDA)
-# 		if load: self.load_model(load)
-
-# 	def init_weights(self, model=None):
-# 		model = self if model is None else model
-# 		model.apply(lambda m: torch.nn.init.xavier_normal_(m.weight) if type(m) in [torch.nn.Conv2d, torch.nn.Linear] else None)
-		
-# 	def step(self, optimizer, loss, retain=False):
-# 		optimizer.zero_grad()
-# 		loss.backward(retain_graph=retain)
-# 		optimizer.step()
-
-# 	def soft_copy(self, local, target):
-# 		for t,l in zip(target.parameters(), local.parameters()):
-# 			t.data.copy_(t.data + self.tau*(l.data - t.data))
-
-# 	def save_model(self, net="qlearning", dirname="pytorch", name="checkpoint"):
-# 		filepath = get_checkpoint_path(net, dirname, name)
-# 		os.makedirs(os.path.dirname(filepath), exist_ok=True)
-# 		torch.save(self.actor_local.state_dict(), filepath.replace(".pth", "_a.pth"))
-# 		torch.save(self.critic_local.state_dict(), filepath.replace(".pth", "_c.pth"))
-		
-# 	def load_model(self, net="qlearning", dirname="pytorch", name="checkpoint"):
-# 		filepath = get_checkpoint_path(net, dirname, name)
-# 		if os.path.exists(filepath.replace(".pth", "_a.pth")):
-# 			self.actor_local.load_state_dict(torch.load(filepath.replace(".pth", "_a.pth"), map_location=self.device))
-# 			self.actor_target.load_state_dict(torch.load(filepath.replace(".pth", "_a.pth"), map_location=self.device))
-# 			self.critic_local.load_state_dict(torch.load(filepath.replace(".pth", "_c.pth"), map_location=self.device))
-# 			self.critic_target.load_state_dict(torch.load(filepath.replace(".pth", "_c.pth"), map_location=self.device))
-# 			print(f"Loaded model at {filepath}")
-
 class PTACAgent(RandomAgent):
-	def __init__(self, state_size, action_size, network=PTACNetwork, lr=LEARN_RATE, update_freq=NUM_STEPS, eps=EPS_MAX, decay=EPS_DECAY, gpu=True, load=None):
+	def __init__(self, state_size, action_size, network=PTACNetwork, lr=LEARN_RATE, update_freq=NUM_STEPS, eps=EPS_MAX, decay=EPS_DECAY, tau=TARGET_UPDATE_RATE, gpu=True, load=None):
 		super().__init__(state_size, action_size, eps)
-		self.network = network(state_size, action_size, lr=lr, gpu=gpu, load=load)
-		# self.to_tensor = lambda x: torch.from_numpy(np.array(x)).float().to(self.network.device)
+		self.network = network(state_size, action_size, lr=lr, tau=tau, gpu=gpu, load=load)
 		self.replay_buffer = ReplayBuffer(MAX_BUFFER_SIZE)
 		self.update_freq = update_freq
 		self.buffer = []

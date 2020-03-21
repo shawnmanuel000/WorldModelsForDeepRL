@@ -14,8 +14,8 @@ import psutil as psu
 import GPUtil as gputil
 import platform as pfm
 import matplotlib.pyplot as plt
-from models.vae import VAE
-from models.mdrnn import MDRNNCell
+from models.worldmodel.vae import VAE
+from models.worldmodel.mdrnn import MDRNNCell
 np.set_printoptions(precision=3, sign=' ', floatmode="fixed")
 
 IMG_DIM = 64					# The height and width to scale the environment image to
@@ -60,9 +60,9 @@ def rollout(env, agent, eps=None, render=False, sample=False, log_dir=None):
 			if render: env.render()
 			env_action = agent.get_env_action(env, state, eps, sample)[0]
 			state, reward, ndone, _ = env.step(env_action)
-			reward = np.array(reward) if type(reward) == list else reward
-			total_reward = reward if total_reward is None else total_reward + reward
+			reward = reward*((done.astype(np.int32)+ndone)<2).astype(np.float32) if done is not None else reward
 			done = np.array(ndone) if done is None else np.logical_or(done, ndone)
+			total_reward = reward if total_reward is None else total_reward + reward
 	return total_reward
 
 LOG_DIR = "logs"

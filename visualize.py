@@ -5,14 +5,14 @@ import torch
 import argparse
 import numpy as np
 from torchvision import transforms
-from models.vae import VAE, LATENT_SIZE
-from models.mdrnn import MDRNNCell, HIDDEN_SIZE
-from models.controller import ControlAgent
+from models.worldmodel.vae import VAE, LATENT_SIZE
+from models.worldmodel.mdrnn import MDRNNCell, HIDDEN_SIZE
+from models.worldmodel.controller import ControlAgent
 from models.ddpg import DDPGAgent, EPS_MIN
 from models.ppo import PPOAgent
 from utils.misc import IMG_DIM, resize, make_video
 from utils.envs import ImgStack, WorldModel
-from train_a3c import WorldACAgent, rollout
+from utils.wrappers import WorldACAgent, rollout
 from data.loaders import ROOT
 
 parser = argparse.ArgumentParser(description="Visualizer")

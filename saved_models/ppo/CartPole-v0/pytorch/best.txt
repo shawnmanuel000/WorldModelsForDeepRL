@@ -1,6 +1,7 @@
 class PPOActor(torch.nn.Module):
 	def __init__(self, state_size, action_size):
 		super().__init__()
+		self.discrete = type(action_size) != tuple
 		self.layer1 = torch.nn.Linear(state_size[-1], INPUT_LAYER) if len(state_size)!=3 else Conv(state_size, INPUT_LAYER)
 		self.layer2 = torch.nn.Linear(INPUT_LAYER, ACTOR_HIDDEN)
 		self.layer3 = torch.nn.Linear(ACTOR_HIDDEN, ACTOR_HIDDEN)

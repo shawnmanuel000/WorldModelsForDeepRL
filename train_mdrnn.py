@@ -1,11 +1,11 @@
 import torch
 import argparse
 import numpy as np
-from torchvision import transforms
-from models.mdrnn import MDRNN
-from models.vae import VAE, LATENT_SIZE
-from data.loaders import RolloutSequenceDataset, ROOT
 from train_a3c import env_name, make_env
+from torchvision import transforms
+from data.loaders import RolloutSequenceDataset, ROOT
+from models.worldmodel.vae import VAE, LATENT_SIZE
+from models.worldmodel.mdrnn import MDRNN
 
 parser = argparse.ArgumentParser(description="MDRNN Trainer")
 parser.add_argument("--epochs", type=int, default=50, help="Number of epochs to train the VAE")

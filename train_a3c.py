@@ -5,11 +5,11 @@ import argparse
 import numpy as np
 import vizdoom as vzd
 from collections import deque
-from models.ppo import PPOAgent
-from models.rand import RandomAgent
-from models.ddpg import DDPGAgent, EPS_MIN
-from utils.wrappers import WorldACAgent
+from models.singleagent.ppo import PPOAgent
+from models.singleagent.ddpg import DDPGAgent, EPS_MIN
 from utils.multiprocess import set_rank_size
+from utils.wrappers import WorldACAgent
+from utils.rand import RandomAgent
 from utils.envs import EnsembleEnv, EnvManager, EnvWorker, GymEnv
 from utils.misc import Logger, rollout
 from dependencies import VizDoomEnv
@@ -17,6 +17,8 @@ from dependencies import VizDoomEnv
 TRIAL_AT = 1000
 SAVE_AT = 1
 
+env_name = "CartPole-v0"
+# env_name = "Pendulum-v0"
 # env_name = "basic"
 # env_name = "my_way_home"
 # env_name = "health_gathering"
@@ -25,11 +27,8 @@ SAVE_AT = 1
 # env_name = "defend_the_line"
 # env_name = "take_cover"
 env_names = ["defend_the_line", "take_cover", "CarRacing-v0"]
-env_name = env_names[-1]
+# env_name = env_names[-1]
 models = {"ppo":PPOAgent, "ddpg":DDPGAgent}
-
-env_name = "CartPole-v0"
-# env_name = "Pendulum-v0"
 
 def make_env():
 	if "-v" in env_name:
@@ -42,7 +41,7 @@ def make_env():
 def train(make_env, model, ports, steps, checkpoint=None, save_best=False, log=True, render=False):
 	envs = (EnvManager if len(ports)>0 else EnsembleEnv)(make_env, ports)
 	agent = WorldACAgent(envs.state_size, envs.action_size, model, envs.num_envs, load="", gpu=True, worldmodel=True) 
-	logger = Logger(model, checkpoint, num_envs=envs.num_envs, state_size=agent.state_size, action_size=envs.action_size, action_space=envs.env.action_space, envs=type(envs))
+	logger = Logger(model, checkpoint, num_envs=envs.num_envs, state_size=agent.state_size, action_size=envs.action_size, action_space=envs.env.action_space, envs=type(envs), statemodel=agent.state_model)
 	states = envs.reset(train=True)
 	total_rewards = []
 	for s in range(steps+1):
@@ -55,26 +54,13 @@ def train(make_env, model, ports, steps, checkpoint=None, save_best=False, log=T
 			total_rewards.append(np.round(np.mean(rollouts, axis=-1), 3))
 			if checkpoint and len(total_rewards)%SAVE_AT==0: agent.save_model(checkpoint)
 			if checkpoint and save_best and np.all(total_rewards[-1] >= np.max(total_rewards, axis=-1)): agent.save_model(checkpoint, "best")
-			if log: logger.log(f"Step: {s:7d}, Reward: {total_rewards[-1]} [{np.std(rollouts):4.3f}], Avg: {np.mean(total_rewards, axis=0)} ({agent.eps:.4f})")
+			if log: logger.log(f"Step: {s:7d}, Reward: {total_rewards[-1]} [{np.std(rollouts):4.3f}], Avg: {np.mean(total_rewards, axis=0)} ({agent.acagent.eps:.4f})")
 	envs.close()
 
-def trial(make_env, model, steps=40000, ports=4):
-	envs = EnvManager(make_env, ports) if type(ports) == list else EnsembleEnv(make_env, ports)
-	agent = model(envs.state_size, envs.action_size, decay=0.99)
-	env = make_env()
-	state = envs.reset()
-	test_rewards = []
-	for s in range(steps):
-		env_action, action = agent.get_env_action(env, state)
-		next_state, reward, done, _ = envs.step(env_action)
-		agent.train(state, action, next_state, reward, done)
-		state = next_state
-		if np.any(done[0]):
-			test_reward = np.mean([rollout(env, agent) for _ in range(10)])
-			test_rewards.append(test_reward)
-			print(f"Ep: {s//env.spec.max_episode_steps}, Rewards: {test_reward}, Avg: {np.mean(test_rewards)}")
-			if test_reward > -200: break
-	env.close()
+def trial(make_env, model, checkpoint=None, log=False):
+	envs = EnsembleEnv(make_env, 1)
+	agent = WorldACAgent(envs.state_size, envs.action_size, model, envs.num_envs, load="", gpu=False, worldmodel=True).load(checkpoint)
+	print(f"Reward: {rollout(envs, agent, eps=EPS_MIN, render=True)}")
 	envs.close()
 
 def parse_args(envs, models):
@@ -98,6 +84,6 @@ if __name__ == "__main__":
 	if rank>0:
 		EnvWorker(make_env=make_env).start()
 	elif args.trial:
-		trial(make_env=make_env, model=model)
+		trial(make_env=make_env, model=model, checkpoint=checkpoint)
 	else:
 		train(make_env=make_env, model=model, ports=list(range(1,size)), steps=args.steps, checkpoint=checkpoint, render=args.render)

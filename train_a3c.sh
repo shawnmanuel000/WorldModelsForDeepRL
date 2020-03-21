@@ -1,5 +1,5 @@
 models=([1]="ddpg" [2]="ppo")
-iternums=([1]="-1") [2]="0" [3]="1")
+iternums=([1]="-1" [2]="0" [3]="1")
 
 iter=$1
 model=$2

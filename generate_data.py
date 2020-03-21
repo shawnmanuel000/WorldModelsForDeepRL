@@ -7,7 +7,7 @@ import argparse
 import numpy as np
 import utils.misc as misc
 from models.controller import ControlAgent
-from models.rand import RandomAgent
+from utils.rand import RandomAgent
 from data.loaders import ROOT
 from train_a3c import make_env, env_name
 import matplotlib.pyplot as plt
