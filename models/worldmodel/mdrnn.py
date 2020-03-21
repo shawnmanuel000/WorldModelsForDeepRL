@@ -99,7 +99,7 @@ class MDRNNCell(torch.nn.Module):
 	def forward(self, actions, latents, hiddens):
 		with torch.no_grad():
 			actions, latents = [x.to(self.device) for x in (torch.from_numpy(actions), latents)]
-			if self.discrete: actions = one_hot_from_indices(actions, 2, keepdims=True)
+			if self.discrete: actions = one_hot_from_indices(actions, self.action_size[-1], keepdims=True)
 			lstm_inputs = torch.cat([actions, latents], dim=-1)
 			lstm_hidden = self.lstm(lstm_inputs, hiddens)
 			return lstm_hidden

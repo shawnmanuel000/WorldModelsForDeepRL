@@ -64,7 +64,7 @@ class WorldModel():
 		self.hiddens[num_envs] = self.hidden
 
 	def get_state(self, state, numpy=True):
-		state = torch.cat([self.transform(s).unsqueeze(0) for s in state]) if self.num_envs > 1 else self.transform(state).unsqueeze(0)
+		state = torch.cat([self.transform(s).unsqueeze(0) for s in state]) if len(state.shape) > 3 else self.transform(state).unsqueeze(0)
 		latent = self.vae.get_latents(state)
 		lat_hid = torch.cat([latent, self.hidden[0]], dim=1)
 		return lat_hid.cpu().numpy() if numpy else lat_hid, latent

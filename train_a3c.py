@@ -3,21 +3,19 @@ import gym
 import torch
 import argparse
 import numpy as np
-import vizdoom as vzd
-from collections import deque
+from envs import VizDoomEnv
+from utils.rand import RandomAgent
+from utils.misc import Logger, rollout
+from utils.envs import EnsembleEnv, EnvManager, EnvWorker, GymEnv
+from utils.wrappers import WorldACAgent
+from utils.multiprocess import set_rank_size
 from models.singleagent.ppo import PPOAgent
 from models.singleagent.ddpg import DDPGAgent, EPS_MIN
-from utils.multiprocess import set_rank_size
-from utils.wrappers import WorldACAgent
-from utils.rand import RandomAgent
-from utils.envs import EnsembleEnv, EnvManager, EnvWorker, GymEnv
-from utils.misc import Logger, rollout
-from dependencies import VizDoomEnv
 
 TRIAL_AT = 1000
 SAVE_AT = 1
 
-env_name = "CartPole-v0"
+# env_name = "CartPole-v0"
 # env_name = "Pendulum-v0"
 # env_name = "basic"
 # env_name = "my_way_home"
@@ -27,20 +25,20 @@ env_name = "CartPole-v0"
 # env_name = "defend_the_line"
 # env_name = "take_cover"
 env_names = ["defend_the_line", "take_cover", "CarRacing-v0"]
-# env_name = env_names[-1]
+env_name = env_names[0]
 models = {"ppo":PPOAgent, "ddpg":DDPGAgent}
 
 def make_env():
 	if "-v" in env_name:
-		env = gym.make(env_name)
-		env.env.verbose = 0
+		env = GymEnv(gym.make(env_name))
+		env.unwrapped.verbose = 0
 	else:
 		env = VizDoomEnv(env_name)
-	return GymEnv(env)
+	return env
 
 def train(make_env, model, ports, steps, checkpoint=None, save_best=False, log=True, render=False):
 	envs = (EnvManager if len(ports)>0 else EnsembleEnv)(make_env, ports)
-	agent = WorldACAgent(envs.state_size, envs.action_size, model, envs.num_envs, load="", gpu=True, worldmodel=True) 
+	agent = WorldACAgent(envs.state_size, envs.action_size, model, envs.num_envs, load=checkpoint, gpu=True, worldmodel=True) 
 	logger = Logger(model, checkpoint, num_envs=envs.num_envs, state_size=agent.state_size, action_size=envs.action_size, action_space=envs.env.action_space, envs=type(envs), statemodel=agent.state_model)
 	states = envs.reset(train=True)
 	total_rewards = []
@@ -59,7 +57,7 @@ def train(make_env, model, ports, steps, checkpoint=None, save_best=False, log=T
 
 def trial(make_env, model, checkpoint=None, log=False):
 	envs = EnsembleEnv(make_env, 1)
-	agent = WorldACAgent(envs.state_size, envs.action_size, model, envs.num_envs, load="", gpu=False, worldmodel=True).load(checkpoint)
+	agent = WorldACAgent(envs.state_size, envs.action_size, model, envs.num_envs, load="", train=False, gpu=False, worldmodel=True).load(checkpoint)
 	print(f"Reward: {rollout(envs, agent, eps=EPS_MIN, render=True)}")
 	envs.close()
 
