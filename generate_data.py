@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 
 parser = argparse.ArgumentParser(description="Rollout Generator")
 parser.add_argument("--nsamples", type=int, default=1, help="How many rollouts to save")
-parser.add_argument("--iternum", type=int, default=0, choices=[0,1], help="Which iteration of trained World Model to load (0 or 1)")
+parser.add_argument("--iternum", type=int, default=1, choices=[0,1], help="Which iteration of trained World Model to load (0 or 1)")
 parser.add_argument("--datadir", type=str, default=ROOT, help="The directory path to save the sampled rollouts")
 args = parser.parse_args()
 
@@ -47,12 +47,12 @@ class RolloutCollector():
 		self.reset_rollout()
 
 def sample(runs, iternum, root=ROOT, number=None):
-	dirname = f"iter{iternum}/"
+	dirname = os.path.join(root, f"iter{iternum}/")
 	env = make_env()
-	os.makedirs(os.path.dirname(os.path.join(root, dirname)), exist_ok=True)
-	rollout = RolloutCollector(os.path.join(root, dirname))
+	os.makedirs(os.path.dirname(dirname), exist_ok=True)
+	rollout = RolloutCollector(dirname)
 	action_size = [env.action_space.n] if hasattr(env.action_space, 'n') else env.action_space.shape
-	agent = RandomAgent(action_size) if iternum <= 0 else ControlAgent(action_size=action_size, gpu=False, load=f"iter{iternum-1}/")
+	agent = RandomAgent(action_size) if iternum <= 0 else ControlAgent(action_size=action_size, gpu=False, load=f"{env_name}/iter{iternum-1}/")
 	for ep in range(runs):
 		state = env.reset()
 		total_reward = 0

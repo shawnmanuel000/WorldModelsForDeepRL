@@ -27,7 +27,7 @@ class WorldModel():
 		self.state_size = [LATENT_SIZE + HIDDEN_SIZE]
 		self.hiddens = {}
 		self.reset(num_envs)
-		if load: self.load_model(load)
+		if load: self.load_model()
 
 	def reset(self, num_envs, restore=False):
 		self.num_envs = num_envs
@@ -43,7 +43,7 @@ class WorldModel():
 	def step(self, latent, env_action):
 		self.hidden = self.mdrnn(env_action.astype(np.float32), latent, self.hidden)
 
-	def load_model(self, dirname="pytorch", name="best"):
+	def load_model(self, dirname="pytorch", name="latest"):
 		self.vae.load_model(dirname, name)
 		self.mdrnn.load_model(dirname, name)
 		return self

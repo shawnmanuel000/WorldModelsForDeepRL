@@ -50,6 +50,7 @@ class Controller():
 		filepath = get_checkpoint_path(dirname, name)
 		if os.path.exists(filepath):
 			self.actor_local.load_state_dict(torch.load(filepath, map_location=self.device))
+			print(f"Loaded CTRL model at {filepath}")
 		return self
 
 class ControlAgent(RandomAgent):

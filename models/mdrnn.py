@@ -80,6 +80,7 @@ class MDRNN(torch.nn.Module):
 		filepath = get_checkpoint_path(dirname, name)
 		if os.path.exists(filepath):
 			self.load_state_dict(torch.load(filepath, map_location=self.device))
+			print(f"Loaded MDRNN model at {filepath}")
 		return self
 
 class MDRNNCell(torch.nn.Module):
@@ -125,6 +126,7 @@ class MDRNNCell(torch.nn.Module):
 		filepath = get_checkpoint_path(dirname, name)
 		if os.path.exists(filepath):
 			self.load_state_dict({k.replace("_l0",""):v for k,v in torch.load(filepath, map_location=self.device).items()})
+			print(f"Loaded MDRNNCell model at {filepath}")
 		return self
 
 def get_checkpoint_path(dirname="pytorch", name="best"):
