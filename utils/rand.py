@@ -76,7 +76,7 @@ class RandomAgent():
 		return action_space.low + np.multiply((1+action)/2, action_space.high - action_space.low)
 
 	def train(self, state, action, next_state, reward, done):
-		if np.any(done[0]): self.noise_process.reset()
+		if np.any(done): self.noise_process.reset()
 
 class ReplayBuffer():
 	def __init__(self, maxlen=None):

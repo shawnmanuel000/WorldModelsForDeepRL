@@ -1,8 +1,8 @@
 import os
 import torch
 import numpy as np
-from utils.envs import WorldModel
 from utils.rand import RandomAgent
+from utils.wrappers import WorldModel
 from models.worldmodel.vae import LATENT_SIZE
 from models.worldmodel.mdrnn import HIDDEN_SIZE, ACTION_SIZE
 
@@ -54,9 +54,9 @@ class Controller():
 		return self
 
 class ControlAgent(RandomAgent):
-	def __init__(self, action_size, gpu=True, load=""):
-		super().__init__(action_size)
-		self.world_model = WorldModel(action_size, num_envs=1, load=load, gpu=gpu)
+	def __init__(self, state_size, action_size, gpu=True, load=""):
+		super().__init__(state_size, action_size)
+		self.world_model = WorldModel(state_size, action_size, num_envs=1, load=load, gpu=gpu)
 		self.network = Controller(self.world_model.state_size, action_size, gpu=gpu, load=load)
 
 	def get_action(self, state, eps=None, sample=True):

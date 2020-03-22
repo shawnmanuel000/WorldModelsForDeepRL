@@ -48,11 +48,12 @@ class RolloutCollector():
 
 def sample(runs, iternum, root=ROOT, number=None):
 	dirname = os.path.join(root, f"iter{iternum}/")
-	env = make_env()
 	os.makedirs(os.path.dirname(dirname), exist_ok=True)
 	rollout = RolloutCollector(dirname)
+	env = make_env()
+	state_size = env.observation_space.shape
 	action_size = [env.action_space.n] if hasattr(env.action_space, 'n') else env.action_space.shape
-	agent = RandomAgent(action_size) if iternum <= 0 else ControlAgent(action_size=action_size, gpu=False, load=f"{env_name}/iter{iternum-1}/")
+	agent = RandomAgent(state_size, action_size) if iternum <= 0 else ControlAgent(state_size, action_size, gpu=False, load=f"{env_name}/iter{iternum-1}/")
 	for ep in range(runs):
 		state = env.reset()
 		total_reward = 0

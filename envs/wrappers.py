@@ -20,7 +20,7 @@ class GymEnv(gym.Wrapper):
 		return super().step(action)
 
 class VizDoomEnv():
-	def __init__(self, env_name, resize=IMG_DIM, transpose=[1,2,0], render=True):
+	def __init__(self, env_name, resize=IMG_DIM, transpose=[1,2,0], render=False):
 		self.transpose = transpose
 		self.env = vzd.DoomGame()
 		self.env.load_config(os.path.abspath(f"./envs/ViZDoom/scenarios/{env_name}.cfg"))

@@ -18,11 +18,16 @@ parser.add_argument("--selfport", type=int, default=None, help="Which port to li
 parser.add_argument("--iternum", type=int, default=0, help="Which iteration of trained World Model to load")
 args = parser.parse_args()
 
+def get_env():
+	env = make_env()
+	state_size = env.observation_space.shape
+	action_size = [env.action_space.n] if hasattr(env.action_space, 'n') else env.action_space.shape
+	return env, state_size, action_size
+
 class ControllerWorker(Worker):
 	def start(self, load_dirname, gpu=True, iterations=1):
-		env = make_env()
-		action_size = [env.action_space.n] if hasattr(env.action_space, 'n') else env.action_space.shape
-		agent = ControlAgent(action_size=action_size, gpu=gpu, load=load_dirname)
+		env, state_size, action_size = get_env()
+		agent = ControlAgent(state_size, action_size, gpu=gpu, load=load_dirname)
 		episode = 0
 		while True:
 			data = pickle.loads(self.conn.recv(100000))
@@ -45,12 +50,12 @@ class ControllerManager(Manager):
 		train(save_dirname, get_scores, epochs, popsize=popsize)
 
 def train(save_dirname, get_scores, epochs=250, popsize=4, restarts=1):
-	env = make_env()
-	action_size = [env.action_space.n] if hasattr(env.action_space, 'n') else env.action_space.shape
+	env, state_size, action_size = get_env()
+	agent = Controller(state_size, action_size, gpu=False, load=False)
 	logger = Logger(Controller, save_dirname, popsize=popsize, restarts=restarts)
-	controller = Controller(action_size=action_size, gpu=False, load=False)
-	best_solution = (controller.get_params(), -np.inf)
+	best_solution = (agent.get_params(), -np.inf)
 	total_scores = []
+	env.close()
 	for run in range(restarts):
 		start_epochs = epochs//restarts
 		es = cma.CMAEvolutionStrategy(best_solution[0], 0.1, {"popsize": popsize})
@@ -63,14 +68,13 @@ def train(save_dirname, get_scores, epochs=250, popsize=4, restarts=1):
 			best_index = np.argmax(scores)
 			best_params = (params[best_index], scores[best_index])
 			if best_params[1] > best_solution[1]:
-				controller.set_params(best_params[0]).save_model(save_dirname)
+				agent.set_params(best_params[0]).save_model(save_dirname)
 				best_solution = best_params
 			logger.log(f"Ep: {run}-{start_epochs}, Best score: {best_params[1]:3.4f}, Min: {np.min(scores):.4f}, Avg: {total_scores[-1]:.4f}, Rolling: {np.mean(total_scores):.4f}")
 
 def run(load_dirname, gpu=True, iterations=1):
-	env = make_env()
-	action_size = [env.action_space.n] if hasattr(env.action_space, 'n') else env.action_space.shape
-	agent = ControlAgent(action_size, gpu=gpu, load=load_dirname)
+	env, state_size, action_size = get_env()
+	agent = ControlAgent(state_size, action_size, gpu=gpu, load=load_dirname)
 	get_scores = lambda params: [np.mean([rollout(env, agent.set_params(p)) for _ in range(iterations)]) for p in params]
 	train(load_dirname, get_scores, 1000)
 	env.close()
