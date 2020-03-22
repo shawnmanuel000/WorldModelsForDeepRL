@@ -41,7 +41,7 @@ def trial(make_env, model, checkpoint=None, log=False):
 
 def parse_args(envs, all_models):
 	parser = argparse.ArgumentParser(description="A3C Trainer")
-	parser.add_argument("--env_name", type=str, choices=envs, help="Name of the environment to use. Allowed values are:\n"+', '.join(envs), metavar="env_name")
+	parser.add_argument("--env_name", type=str, default=env_name, choices=envs, help="Name of the environment to use. Allowed values are:\n"+', '.join(envs), metavar="env_name")
 	parser.add_argument("--model", type=str, default="ppo", choices=all_models, help="Which RL algorithm to use. Allowed values are:\n"+', '.join(all_models), metavar="model")
 	parser.add_argument("--iternum", type=int, default=-1, choices=[-1,0,1], help="Whether to train using World Model to load (0 or 1) or raw images (-1)")
 	parser.add_argument("--tcp_ports", type=int, default=[], nargs="+", help="The list of worker ports to connect to")
@@ -54,8 +54,9 @@ def parse_args(envs, all_models):
 
 if __name__ == "__main__":
 	args = parse_args(env_names, all_models.keys())
-	checkpoint = f"{env_name}/pytorch" if args.iternum < 0 else f"{env_name}/iter{args.iternum}/"
+	checkpoint = f"{args.env_name}/pytorch" if args.iternum < 0 else f"{args.env_name}/iter{args.iternum}/"
 	rank, size = set_rank_size(args.tcp_rank, args.tcp_ports)
+	make_env = lambda: make_env(args.env_name)
 	model = all_models[args.model]
 	if rank>0:
 		EnvWorker(make_env=make_env).start()
