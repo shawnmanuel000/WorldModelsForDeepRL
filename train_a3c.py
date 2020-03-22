@@ -7,7 +7,7 @@ from envs import make_env, env_names, env_name
 from models import all_models, EPS_MIN
 from utils.rand import RandomAgent
 from utils.misc import Logger, rollout
-from utils.envs import EnsembleEnv, EnvManager, EnvWorker, GymEnv
+from utils.envs import EnsembleEnv, EnvManager, EnvWorker
 from utils.wrappers import WorldACAgent
 from utils.multiprocess import set_rank_size
 
