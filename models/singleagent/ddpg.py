@@ -1,14 +1,8 @@
-import os
-import math
 import torch
 import random
 import numpy as np
 from utils.rand import RandomAgent, PrioritizedReplayBuffer, ReplayBuffer
-from utils.network import PTACNetwork, PTACAgent, Conv, INPUT_LAYER, ACTOR_HIDDEN, CRITIC_HIDDEN, LEARN_RATE, TARGET_UPDATE_RATE, NUM_STEPS, gsoftmax, one_hot
-
-EPS_MIN = 0.020              	# The lower limit proportion of random to greedy actions to take
-EPS_DECAY = 0.98             	# The rate at which eps decays from EPS_MAX to EPS_MIN
-REPLAY_BATCH_SIZE = 128        	# How many experience tuples to sample from the buffer for each train step
+from utils.network import PTACNetwork, PTACAgent, Conv, INPUT_LAYER, ACTOR_HIDDEN, CRITIC_HIDDEN, LEARN_RATE, REPLAY_BATCH_SIZE, TARGET_UPDATE_RATE, NUM_STEPS, EPS_DECAY, EPS_MIN, gsoftmax, one_hot
 
 class DDPGActor(torch.nn.Module):
 	def __init__(self, state_size, action_size):
@@ -64,11 +58,10 @@ class DDPGNetwork(PTACNetwork):
 			critic = self.critic_local if not use_target else self.critic_target
 			return critic(state, action).cpu().numpy() if numpy else critic(state, action)
 	
-	def optimize(self, states, actions, q_targets, importances=1):
+	def optimize(self, states, actions, q_targets, importances=1.0):
 		if self.actor_local.discrete: actions = one_hot(actions)
 		q_values = self.critic_local(states, actions)
-		critic_error = q_values - q_targets.detach()
-		critic_loss = importances.to(self.device) * critic_error.pow(2)
+		critic_loss = (q_values - q_targets.detach()).pow(2)
 		self.step(self.critic_optimizer, critic_loss.mean())
 
 		actor_action = self.actor_local(states)
@@ -104,7 +97,6 @@ class DDPGAgent(PTACAgent):
 			states, actions, targets = [x.view(x.size(0)*x.size(1), *x.size()[2:]).cpu().numpy() for x in (states[:-1], actions[:-1], targets)]
 			self.replay_buffer.extend(list(zip(states, actions, targets)), shuffle=False)	
 		if len(self.replay_buffer) > REPLAY_BATCH_SIZE:
-			(states, actions, targets), indices, importances = self.replay_buffer.sample(REPLAY_BATCH_SIZE, dtype=self.to_tensor)
-			errors = self.network.optimize(states, actions, targets, importances**(1-self.eps))
-			self.replay_buffer.update_priorities(indices, errors)
+			states, actions, targets = self.replay_buffer.sample(REPLAY_BATCH_SIZE, dtype=self.to_tensor)[0]
+			self.network.optimize(states, actions, targets)
 			if np.any(done[0]): self.eps = max(self.eps * self.decay, EPS_MIN)

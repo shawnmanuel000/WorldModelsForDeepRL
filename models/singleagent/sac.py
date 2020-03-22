@@ -1,13 +1,7 @@
-import gym
 import torch
-import random
 import numpy as np
 from utils.rand import ReplayBuffer
-from utils.network import PTACNetwork, PTACAgent, PTCritic, LEARN_RATE, TARGET_UPDATE_RATE, INPUT_LAYER, ACTOR_HIDDEN, CRITIC_HIDDEN, Conv, EPS_DECAY, DISCOUNT_RATE, gsoftmax
-
-# LEARN_RATE = 0.0003
-REPLAY_BATCH_SIZE = 256
-# TARGET_UPDATE_RATE = 0.001
+from utils.network import PTACNetwork, PTACAgent, PTCritic, LEARN_RATE, REPLAY_BATCH_SIZE, TARGET_UPDATE_RATE, INPUT_LAYER, ACTOR_HIDDEN, CRITIC_HIDDEN, Conv, EPS_DECAY, DISCOUNT_RATE, gsoftmax
 
 class SACActor(torch.nn.Module):
 	def __init__(self, state_size, action_size):
@@ -71,7 +65,7 @@ class SACNetwork(PTACNetwork):
 			q_value = critic(state) if self.discrete else critic(state, action)
 			return q_value.cpu().numpy() if numpy else q_value
 	
-	def optimize(self, states, actions, next_states, rewards, dones, importances=torch.tensor(1.0), gamma=DISCOUNT_RATE):
+	def optimize(self, states, actions, next_states, rewards, dones, gamma=DISCOUNT_RATE):
 		alpha = self.log_alpha.clamp(-5, 0).detach().exp()
 		next_actions, next_log_prob = self.actor_local(next_states)
 		q_nexts = self.get_q_value(next_states, next_actions, use_target=True) - alpha*next_log_prob
@@ -80,7 +74,7 @@ class SACNetwork(PTACNetwork):
 
 		q_values = self.get_q_value(states, actions, grad=True)
 		q_values = q_values.gather(-1, actions.argmax(-1, keepdim=True)) if self.discrete else q_values
-		critic1_loss = (q_values - q_targets.detach()).pow(2) * importances.to(self.device)
+		critic1_loss = (q_values - q_targets.detach()).pow(2)
 		self.step(self.critic_optimizer, critic1_loss.mean(), self.critic_local.parameters())
 		self.soft_copy(self.critic_local, self.critic_target)
 

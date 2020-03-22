@@ -7,6 +7,7 @@ from sklearn.model_selection import train_test_split
 from envs import env_name
 
 ROOT = f"/home/shawn/Documents/WorldModelsData/{env_name}"
+# ROOT = f"/Users/shawn/Documents/WorldModelsData/{env_name}"
 
 def get_files(root):
     folders = []

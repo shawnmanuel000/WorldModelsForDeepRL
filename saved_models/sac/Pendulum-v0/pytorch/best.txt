@@ -14,7 +14,7 @@ class SACActor(torch.nn.Module):
 		state = self.layer2(state).relu()
 		state = self.layer3(state).relu()
 		action_mu = self.action_mu(state)
-		action_sig = self.action_sig(state).clamp(-10,1).exp()
+		action_sig = self.action_sig(state).clamp(-5,0).exp()
 		dist = torch.distributions.Normal(action_mu, action_sig)
 		action = dist.rsample() if sample else action_mu
 		action = gsoftmax(action, hard=False) if self.discrete else action

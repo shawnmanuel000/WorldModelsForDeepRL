@@ -19,6 +19,7 @@ EPS_MAX = 1.0                 	# The starting proportion of random to greedy act
 EPS_MIN = 0.020               	# The lower limit proportion of random to greedy actions to take
 EPS_DECAY = 0.980             	# The rate at which eps decays from EPS_MAX to EPS_MIN
 ADVANTAGE_DECAY = 0.95			# The discount factor for the cumulative GAE calculation
+REPLAY_BATCH_SIZE = 32        	# How many experience tuples to sample from the buffer for each train step
 MAX_BUFFER_SIZE = 100000      	# Sets the maximum length of the replay buffer
 
 SAVE_DIR = "./saved_models"

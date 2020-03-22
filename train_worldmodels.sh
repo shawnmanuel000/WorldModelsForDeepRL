@@ -1,7 +1,7 @@
 startIter=0
 numIters=1
 
-for i in `seq 1 $numIters` 
+for i in `seq 0 $numIters` 
 do
 	iter=$((startIter+i))
 	echo "Start iteration $iter"

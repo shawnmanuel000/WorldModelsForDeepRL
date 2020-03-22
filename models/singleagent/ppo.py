@@ -1,12 +1,9 @@
-import gym
 import torch
-import pickle
-import argparse
 import numpy as np
 from utils.rand import ReplayBuffer, PrioritizedReplayBuffer
 from utils.network import PTACNetwork, PTACAgent, Conv, INPUT_LAYER, ACTOR_HIDDEN, CRITIC_HIDDEN, LEARN_RATE, DISCOUNT_RATE, NUM_STEPS, ADVANTAGE_DECAY, one_hot_from_indices
 
-BATCH_SIZE = 128				# Number of samples to train on for each train step
+BATCH_SIZE = 32					# Number of samples to train on for each train step
 PPO_EPOCHS = 2					# Number of iterations to sample batches for training
 ENTROPY_WEIGHT = 0.005			# The weight for the entropy term of the Actor loss
 CLIP_PARAM = 0.05				# The limit of the ratio of new action probabilities to old probabilities
@@ -64,10 +61,9 @@ class PPONetwork(PTACNetwork):
 		with torch.enable_grad() if grad else torch.no_grad():
 			return self.critic_local(state.to(self.device)).cpu().numpy() if numpy else self.critic_local(state.to(self.device))
 
-	def optimize(self, states, actions, old_log_probs, targets, advantages, importances=torch.tensor(1.0), clip_param=CLIP_PARAM, e_weight=ENTROPY_WEIGHT, scale=1):
+	def optimize(self, states, actions, old_log_probs, targets, advantages, clip_param=CLIP_PARAM, e_weight=ENTROPY_WEIGHT, scale=1):
 		values = self.get_value(states, grad=True)
-		critic_error = values - targets
-		critic_loss = importances.to(self.device) * critic_error.pow(2) * scale
+		critic_loss = (values - targets).pow(2) * scale
 		self.step(self.critic_optimizer, critic_loss.mean())
 
 		entropy, new_log_probs = self.get_action_probs(states, actions, grad=True)
@@ -75,7 +71,6 @@ class PPONetwork(PTACNetwork):
 		ratio_clipped = torch.clamp(ratio, 1.0-clip_param, 1.0+clip_param)
 		actor_loss = -(torch.min(ratio*advantages, ratio_clipped*advantages) + e_weight*entropy) * scale
 		self.step(self.actor_optimizer, actor_loss.mean())
-		return critic_error.cpu().detach().numpy().squeeze(-1)
 
 class PPOAgent(PTACAgent):
 	def __init__(self, state_size, action_size, lr=LEARN_RATE, update_freq=NUM_STEPS, gpu=True, load=None):
@@ -97,4 +92,4 @@ class PPOAgent(PTACAgent):
 			self.replay_buffer.clear().extend(list(zip(states, actions, log_probs, targets, advantages)), shuffle=True)
 			for _ in range((len(self.replay_buffer)*PPO_EPOCHS)//BATCH_SIZE):
 				state, action, log_prob, target, advantage = self.replay_buffer.next_batch(BATCH_SIZE, torch.stack)
-				self.network.optimize(state, action, log_prob, target, advantage, scale=16*dones.size(0)/len(self.replay_buffer))
+				self.network.optimize(state, action, log_prob, target, advantage)
