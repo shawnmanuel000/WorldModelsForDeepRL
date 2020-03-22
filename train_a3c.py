@@ -56,11 +56,11 @@ if __name__ == "__main__":
 	args = parse_args(env_names, all_models.keys())
 	checkpoint = f"{args.env_name}/pytorch" if args.iternum < 0 else f"{args.env_name}/iter{args.iternum}/"
 	rank, size = set_rank_size(args.tcp_rank, args.tcp_ports)
-	make_env = lambda: make_env(args.env_name)
+	get_env = lambda: make_env(args.env_name)
 	model = all_models[args.model]
 	if rank>0:
-		EnvWorker(make_env=make_env).start()
+		EnvWorker(make_env=get_env).start()
 	elif args.trial:
-		trial(make_env=make_env, model=model, checkpoint=checkpoint)
+		trial(make_env=get_env, model=model, checkpoint=checkpoint)
 	else:
-		train(make_env=make_env, model=model, ports=list(range(1,size)), steps=args.steps, checkpoint=checkpoint, render=args.render)
+		train(make_env=get_env, model=model, ports=list(range(1,size)), steps=args.steps, checkpoint=checkpoint, render=args.render)
