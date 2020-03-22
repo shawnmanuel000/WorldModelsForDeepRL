@@ -2,8 +2,12 @@ import os
 import gym
 import cv2
 import numpy as np
-import vizdoom as vzd
 from utils.misc import resize, IMG_DIM
+
+try:
+	import vizdoom as vzd
+except:
+	print("Unable to import vizdoom")
 
 configs = sorted([s.replace(".cfg","") for s in sorted(os.listdir("./envs/ViZDoom/scenarios/")) if s.endswith(".cfg")])
 
