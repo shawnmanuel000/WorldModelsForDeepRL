@@ -6,10 +6,10 @@ import random
 import argparse
 import numpy as np
 import utils.misc as misc
-from models.controller import ControlAgent
+from envs import make_env, env_name
 from utils.rand import RandomAgent
 from data.loaders import ROOT
-from train_a3c import make_env, env_name
+from models.worldmodel.controller import ControlAgent
 import matplotlib.pyplot as plt
 
 parser = argparse.ArgumentParser(description="Rollout Generator")

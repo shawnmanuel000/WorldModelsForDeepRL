@@ -1,10 +1,10 @@
 import torch
 import argparse
 import numpy as np
+from envs import env_name
 from torchvision import transforms
 from data.loaders import RolloutObservationDataset, ROOT
 from utils.misc import IMG_DIM
-from train_a3c import env_name
 from models.worldmodel.vae import VAE
 
 parser = argparse.ArgumentParser(description="VAE Trainer")

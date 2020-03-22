@@ -1,7 +1,7 @@
 import torch
 import argparse
 import numpy as np
-from train_a3c import env_name, make_env
+from envs import env_name, make_env
 from torchvision import transforms
 from data.loaders import RolloutSequenceDataset, ROOT
 from models.worldmodel.vae import VAE, LATENT_SIZE

@@ -13,18 +13,6 @@ def get_space_size(space):
 	if isinstance(space, list): return [get_space_size(sp) for sp in space]
 	raise ValueError()
 
-class GymEnv(gym.Wrapper):
-	def __init__(self, env):
-		super().__init__(env)
-
-	def reset(self, **kwargs):
-		self.time = 0
-		return self.env.reset()
-
-	def step(self, action, train=False):
-		self.time += 1
-		return super().step(action)
-
 class EnsembleEnv():
 	def __init__(self, make_env, num_envs=NUM_ENVS):
 		self.num_envs = len(num_envs) if type(num_envs)==list else num_envs
