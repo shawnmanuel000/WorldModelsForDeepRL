@@ -15,7 +15,7 @@ TRIAL_AT = 1000
 SAVE_AT = 1
 
 def train(make_env, model, ports, steps, checkpoint=None, save_best=False, log=True, render=False):
-	envs = (EnvManager if len(ports)>0 else EnsembleEnv)(make_env, ports)
+	envs = (EnvManager if len(ports)>0 else EnsembleEnv)(make_env, 16)
 	agent = WorldACAgent(envs.state_size, envs.action_size, model, envs.num_envs, load=checkpoint, gpu=True, worldmodel=True) 
 	logger = Logger(model, checkpoint, num_envs=envs.num_envs, state_size=agent.state_size, action_size=envs.action_size, action_space=envs.env.action_space, envs=type(envs), statemodel=agent.state_model)
 	states = envs.reset(train=True)

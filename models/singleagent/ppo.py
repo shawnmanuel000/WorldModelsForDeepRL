@@ -48,8 +48,8 @@ class PPOCritic(torch.nn.Module):
 		return value
 
 class PPONetwork(PTACNetwork):
-	def __init__(self, state_size, action_size, actor=PPOActor, critic=PPOCritic, lr=LEARN_RATE, tau=None, gpu=True, load=None):
-		super().__init__(state_size, action_size, actor=actor, critic=critic, lr=lr, gpu=gpu, load=load, name="ppo")
+	def __init__(self, state_size, action_size, actor=PPOActor, critic=PPOCritic, lr=LEARN_RATE, tau=None, gpu=True, load=None, name="ppo"):
+		super().__init__(state_size, action_size, actor=actor, critic=critic, lr=lr, gpu=gpu, load=load, name=name)
 
 	def get_action_probs(self, state, action_in=None, grad=False, numpy=False, sample=True):
 		with torch.enable_grad() if grad else torch.no_grad():

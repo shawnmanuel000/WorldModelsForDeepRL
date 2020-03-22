@@ -14,6 +14,7 @@ import psutil as psu
 import GPUtil as gputil
 import platform as pfm
 import matplotlib.pyplot as plt
+from models import all_models
 from models.worldmodel.vae import VAE
 from models.worldmodel.mdrnn import MDRNNCell
 np.set_printoptions(precision=3, sign=' ', floatmode="fixed")
@@ -69,7 +70,6 @@ LOG_DIR = "logs"
 
 class Logger():
 	def __init__(self, model_class, env_name, **kwconfig):
-		models = ["ddqn", "ddpg", "ppo", "rand", "coma", "maddpg", "mappo"]
 		self.git_info = self.get_git_info()
 		self.config = kwconfig
 		self.env_name = env_name
@@ -78,8 +78,8 @@ class Logger():
 		os.makedirs(f"{LOG_DIR}/{self.model_name}/{env_name}/", exist_ok=True)
 		self.run_num = len([n for n in os.listdir(f"{LOG_DIR}/{self.model_name}/{env_name}/")])
 		self.model_src = [line for line in open(inspect.getabsfile(self.model_class))]
-		self.net_src = [line for line in open(f"utils/network.py") if re.match("^[A-Z]", line)] if self.model_name in models else None
-		self.trn_src = [line for line in open(f"train_a3c.py")] if self.model_name in models else None
+		self.net_src = [line for line in open(f"utils/network.py") if re.match("^[A-Z]", line)] if self.model_name in all_models.keys() else None
+		self.trn_src = [line for line in open(f"train_a3c.py")] if self.model_name in all_models.keys() else None
 		self.log_path = f"{LOG_DIR}/{self.model_name}/{env_name}/logs_{self.run_num}.txt"
 		self.log_num = 0
 

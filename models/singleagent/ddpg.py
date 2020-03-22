@@ -45,8 +45,8 @@ class DDPGCritic(torch.nn.Module):
 		return q_value
 
 class DDPGNetwork(PTACNetwork):
-	def __init__(self, state_size, action_size, actor=DDPGActor, critic=DDPGCritic, lr=LEARN_RATE, tau=TARGET_UPDATE_RATE, gpu=True, load=None): 
-		super().__init__(state_size, action_size, actor=actor, critic=critic, lr=lr, tau=tau, gpu=gpu, load=load, name="ddpg")
+	def __init__(self, state_size, action_size, actor=DDPGActor, critic=DDPGCritic, lr=LEARN_RATE, tau=TARGET_UPDATE_RATE, gpu=True, load=None, name="ddpg"): 
+		super().__init__(state_size, action_size, actor=actor, critic=critic, lr=lr, tau=tau, gpu=gpu, load=load, name=name)
 
 	def get_action(self, state, use_target=False, grad=False, numpy=True, sample=True):
 		with torch.enable_grad() if grad else torch.no_grad():
@@ -63,15 +63,13 @@ class DDPGNetwork(PTACNetwork):
 		q_values = self.critic_local(states, actions)
 		critic_loss = (q_values - q_targets.detach()).pow(2)
 		self.step(self.critic_optimizer, critic_loss.mean())
+		self.soft_copy(self.critic_local, self.critic_target)
 
 		actor_action = self.actor_local(states)
 		q_actions = self.critic_local(states, actor_action)
 		actor_loss = -(q_actions - q_values.detach())
 		self.step(self.actor_optimizer, actor_loss.mean())
-		
 		self.soft_copy(self.actor_local, self.actor_target)
-		self.soft_copy(self.critic_local, self.critic_target)
-		return critic_error.cpu().detach().numpy().squeeze(-1)
 		
 class DDPGAgent(PTACAgent):
 	def __init__(self, state_size, action_size, decay=EPS_DECAY, lr=LEARN_RATE, tau=TARGET_UPDATE_RATE, gpu=True, load=None):
