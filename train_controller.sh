@@ -19,16 +19,20 @@ END
 run()
 {
 	ports=()
-	for j in `seq 1 $numWorkers` 
+	for j in `seq 0 $numWorkers` 
 	do
-		port=$((4000+$j))
+		port=$((4000+$baseport+$j))
 		ports+=($port)
-		open_terminal "python3 -B train_controller.py --selfport $port --iternum $iterNum" &
 	done
-
-	sleep 4
 	port_string=$( IFS=$' '; echo "${ports[*]}" )
-	open_terminal "python3 -B train_controller.py --workerports $port_string --iternum $iterNum"
+
+	for j in `seq $numWorkers -1 1` 
+	do
+		open_terminal "python3 -B train_controller.py --iternum $iterNum --tcp_rank $j --tcp_ports $port_string" &
+		sleep 0.4
+	done
+	sleep 4
+	python3 -B train_controller.py --iternum $iterNum --tcp_rank 0 --tcp_ports $port_string
 }
 
 run

@@ -92,10 +92,10 @@ class PTNetwork():
 		model = self if model is None else model
 		model.apply(lambda m: torch.nn.init.xavier_normal_(m.weight) if type(m) in [torch.nn.Conv2d, torch.nn.Linear] else None)
 		
-	def step(self, optimizer, loss, param_norm=None, retain=False):
+	def step(self, optimizer, loss, param_norm=None, retain=False, norm=0.5):
 		optimizer.zero_grad()
 		loss.backward(retain_graph=retain)
-		if param_norm is not None: torch.nn.utils.clip_grad_norm_(param_norm, 0.5)
+		if param_norm is not None: torch.nn.utils.clip_grad_norm_(param_norm, norm)
 		optimizer.step()
 
 	def soft_copy(self, local, target, tau=None):
@@ -106,6 +106,31 @@ class PTNetwork():
 	def get_checkpoint_path(self, dirname="pytorch", name="checkpoint", net=None):
 		filepath = os.path.join(SAVE_DIR, self.name if net is None else net, dirname, f"{name}.pth")
 		return filepath, os.path.dirname(filepath)
+
+class PTQNetwork(PTNetwork):
+	def __init__(self, state_size, action_size, critic=PTCritic, lr=LEARN_RATE, tau=TARGET_UPDATE_RATE, gpu=True, load="", name="ptq"): 
+		super().__init__(tau, gpu, name)
+		self.critic_local = critic(state_size, action_size).to(self.device)
+		self.critic_target = critic(state_size, action_size).to(self.device)
+		self.critic_optimizer = torch.optim.Adam(self.critic_local.parameters(), lr=lr, weight_decay=REG_LAMBDA)
+		if load: self.load_model(load)
+
+	def save_model(self, dirname="pytorch", name="checkpoint", net=None):
+		filepath, _ = self.get_checkpoint_path(dirname, name, net)
+		os.makedirs(os.path.dirname(filepath), exist_ok=True)
+		torch.save(self.critic_local.state_dict(), filepath)
+		with open(filepath.replace(".pth", ".txt"), "w") as f:
+			f.write(inspect.getsource(self.critic_local.__class__))
+		return os.path.dirname(filepath)
+		
+	def load_model(self, dirname="pytorch", name="checkpoint", net=None):
+		filepath, _ = self.get_checkpoint_path(dirname, name, net)
+		if os.path.exists(filepath):
+			try:
+				self.critic_local.load_state_dict(torch.load(filepath, map_location=self.device))
+				self.critic_target.load_state_dict(torch.load(filepath, map_location=self.device))
+			except:
+				print(f"WARN: Error loading model from {filepath}")
 
 class PTACNetwork(PTNetwork):
 	def __init__(self, state_size, action_size, actor=PTActor, critic=PTCritic, lr=LEARN_RATE, tau=TARGET_UPDATE_RATE, gpu=True, load="", name="ptac"): 

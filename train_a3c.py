@@ -3,7 +3,7 @@ import gym
 import torch
 import argparse
 import numpy as np
-from envs import make_env, env_names, env_name
+from envs import make_env, all_envs, env_name
 from models import all_models, EPS_MIN
 from utils.rand import RandomAgent
 from utils.misc import Logger, rollout
@@ -30,7 +30,7 @@ def train(make_env, model, ports, steps, checkpoint=None, save_best=False, log=T
 			total_rewards.append(np.round(np.mean(rollouts, axis=-1), 3))
 			if checkpoint and len(total_rewards)%SAVE_AT==0: agent.save_model(checkpoint)
 			if checkpoint and save_best and np.all(total_rewards[-1] >= np.max(total_rewards, axis=-1)): agent.save_model(checkpoint, "best")
-			if log: logger.log(f"Step: {s:7d}, Reward: {total_rewards[-1]} [{np.std(rollouts):4.3f}], Avg: {np.mean(total_rewards, axis=0)} ({agent.acagent.eps:.4f})")
+			if log: logger.log(f"Step: {s:7d}, Reward: {total_rewards[-1]} [{np.std(rollouts):4.3f}], Avg: {round(np.mean(total_rewards, axis=0),3)} ({agent.acagent.eps:.4f})")
 	envs.close()
 
 def trial(make_env, model, checkpoint=None, render=False):
@@ -39,9 +39,9 @@ def trial(make_env, model, checkpoint=None, render=False):
 	print(f"Reward: {rollout(envs, agent, eps=EPS_MIN, render=render)}")
 	envs.close()
 
-def parse_args(envs, all_models):
+def parse_args(all_envs, all_models):
 	parser = argparse.ArgumentParser(description="A3C Trainer")
-	parser.add_argument("--env_name", type=str, default=env_name, choices=envs, help="Name of the environment to use. Allowed values are:\n"+', '.join(envs), metavar="env_name")
+	parser.add_argument("--env_name", type=str, default=env_name, choices=all_envs, help="Name of the environment to use. Allowed values are:\n"+', '.join(all_envs), metavar="env_name")
 	parser.add_argument("--model", type=str, default="ppo", choices=all_models, help="Which RL algorithm to use. Allowed values are:\n"+', '.join(all_models), metavar="model")
 	parser.add_argument("--iternum", type=int, default=-1, choices=[-1,0,1], help="Whether to train using World Model to load (0 or 1) or raw images (-1)")
 	parser.add_argument("--tcp_ports", type=int, default=[], nargs="+", help="The list of worker ports to connect to")
@@ -53,7 +53,7 @@ def parse_args(envs, all_models):
 	return args
 
 if __name__ == "__main__":
-	args = parse_args(env_names, all_models.keys())
+	args = parse_args(all_envs, all_models.keys())
 	checkpoint = f"{args.env_name}/pytorch" if args.iternum < 0 else f"{args.env_name}/iter{args.iternum}/"
 	rank, size = set_rank_size(args.tcp_rank, args.tcp_ports)
 	get_env = lambda: make_env(args.env_name)

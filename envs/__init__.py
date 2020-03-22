@@ -24,6 +24,7 @@ vzd_envs = [
 	"take_cover",
 ]
 
+all_envs = [*gym_envs, *vzd_envs]
 env_names = [vzd_envs[-2], vzd_envs[-1], gym_envs[5]]
 env_name = env_names[0]
 

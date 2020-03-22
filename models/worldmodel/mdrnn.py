@@ -29,7 +29,9 @@ class MDRNN(torch.nn.Module):
 		if load: self.load_model(load)
 
 	def forward(self, actions, latents):
-		if self.discrete: actions = one_hot_from_indices(actions, self.action_size[-1])
+		if self.discrete: actions = one_hot_from_indices(actions, self.action_size[-1], keepdims=True)
+		if len(actions.shape) != len(latents.shape):
+			print(actions.shape, latents.shape)
 		lstm_inputs = torch.cat([actions, latents], dim=-1)
 		lstm_hiddens, _ = self.lstm(lstm_inputs)
 		gmm_outputs = self.gmm(lstm_hiddens)

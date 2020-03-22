@@ -1,8 +1,9 @@
 
 env=$1
 model=$2
-steps=$3
-baseport=$4
+iter=$3
+steps=$4
+baseport=$5
 workers=16
 
 open_terminal()
@@ -36,11 +37,10 @@ run()
 
 	for j in `seq $numWorkers -1 1` 
 	do
-		open_terminal "python3 -B train_a3c.py --iternum $env --model $agent --steps $steps --tcp_rank $j --tcp_ports $port_string" &
-		sleep 0.4
+		open_terminal "python3 -B train_a3c.py --env_name $env --iternum $iter --model $agent --steps $steps --tcp_rank $j --tcp_ports $port_string" &
 	done
 	sleep 4
-	python3 -B train_a3c.py --iternum $env --model $agent --steps $steps --tcp_rank 0 --tcp_ports $port_string
+	python3 -B train_a3c.py --env_name $env --iternum $iter --model $agent --steps $steps --tcp_rank 0 --tcp_ports $port_string
 }
 
 run $steps $env $model $workers
