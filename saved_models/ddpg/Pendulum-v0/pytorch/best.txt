@@ -17,7 +17,7 @@ class DDPGActor(torch.nn.Module):
 		action_sig = self.action_sig(state).exp()
 		epsilon = torch.randn_like(action_sig)
 		action = action_mu + epsilon.mul(action_sig) if sample else action_mu
-		return action.tanh() if not self.discrete else 2*gsoftmax(action, hard=not sample)-1
+		return action.tanh() if not self.discrete else gsoftmax(action)
 
 class DDPGCritic(torch.nn.Module):
 	def __init__(self, state_size, action_size):

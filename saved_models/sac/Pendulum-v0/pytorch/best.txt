@@ -1,6 +1,7 @@
 class SACActor(torch.nn.Module):
 	def __init__(self, state_size, action_size):
 		super().__init__()
+		self.discrete = type(action_size) != tuple
 		self.layer1 = torch.nn.Linear(state_size[-1], INPUT_LAYER) if len(state_size)!=3 else Conv(state_size, INPUT_LAYER)
 		self.layer2 = torch.nn.Linear(INPUT_LAYER, ACTOR_HIDDEN)
 		self.layer3 = torch.nn.Linear(ACTOR_HIDDEN, ACTOR_HIDDEN)
@@ -13,10 +14,12 @@ class SACActor(torch.nn.Module):
 		state = self.layer2(state).relu()
 		state = self.layer3(state).relu()
 		action_mu = self.action_mu(state)
-		action_sig = self.action_sig(state).clamp(-20,2).exp()
+		action_sig = self.action_sig(state).clamp(-10,1).exp()
 		dist = torch.distributions.Normal(action_mu, action_sig)
 		action = dist.rsample() if sample else action_mu
-		log_prob = dist.log_prob(action) - torch.log(1-action.tanh().pow(2)+1e-6)
+		action = gsoftmax(action, hard=False) if self.discrete else action
+		log_prob = torch.log(action+1e-6) if self.discrete else dist.log_prob(action)
+		log_prob -= torch.log(1-action.tanh().pow(2)+1e-6)
 		return action.tanh(), log_prob
 
 class SACCritic(torch.nn.Module):
