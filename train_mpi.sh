@@ -18,4 +18,4 @@ module load mpi/openmpi-4.0
 module load anaconda/2020a
 
 # Call your script as you would from the command line
-mpirun python -B train_a3c.py --env CarRacing-v0 --model ppo --steps 500000
+mpirun python -B train_a3c.py --model ppo --steps 500000
