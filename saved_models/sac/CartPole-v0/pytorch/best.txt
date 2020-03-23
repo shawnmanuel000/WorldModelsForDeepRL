@@ -8,6 +8,7 @@ class SACActor(torch.nn.Module):
 		self.action_mu = torch.nn.Linear(ACTOR_HIDDEN, action_size[-1])
 		self.action_sig = torch.nn.Linear(ACTOR_HIDDEN, action_size[-1])
 		self.apply(lambda m: torch.nn.init.xavier_normal_(m.weight) if type(m) in [torch.nn.Conv2d, torch.nn.Linear] else None)
+		self.dist = lambda m,s: torch.distributions.Categorical(m.softmax(-1)) if self.discrete else torch.distributions.Normal(m,s)
 		
 	def forward(self, state, action=None, sample=True):
 		state = self.layer1(state).relu()
@@ -17,10 +18,9 @@ class SACActor(torch.nn.Module):
 		action_sig = self.action_sig(state).clamp(-5,0).exp()
 		dist = torch.distributions.Normal(action_mu, action_sig)
 		action = dist.rsample() if sample else action_mu
-		action = gsoftmax(action, hard=False) if self.discrete else action
-		log_prob = torch.log(action+1e-6) if self.discrete else dist.log_prob(action)
-		log_prob -= torch.log(1-action.tanh().pow(2)+1e-6)
-		return action.tanh(), log_prob
+		action_out = gsoftmax(action_mu, hard=False) if self.discrete else action.tanh()
+		log_prob = torch.log(action_out+1e-6) if self.discrete else dist.log_prob(action)-torch.log(1-action_out.pow(2)+1e-6)
+		return action_out, log_prob
 
 class PTCritic(torch.nn.Module):
 	def __init__(self, state_size, action_size=[1]):

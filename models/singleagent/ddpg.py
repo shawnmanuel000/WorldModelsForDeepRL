@@ -63,16 +63,15 @@ class DDPGNetwork(PTACNetwork):
 	
 	def optimize(self, states, actions, q_targets, importances=1.0):
 		actions = one_hot(actions) if self.actor_local.discrete else actions
-		q_values = self.get_q_value(states, actions, grad=True, probs=True)
-		q_taken = q_values.gather(-1, actions.argmax(-1, keepdim=True)) if self.discrete else q_values
-		critic_loss = (q_taken - q_targets.detach()).pow(2)
+		q_values = self.get_q_value(states, actions, grad=True, probs=False)
+		critic_loss = (q_values - q_targets.detach()).pow(2)
 		self.step(self.critic_optimizer, critic_loss.mean())
 		self.soft_copy(self.critic_local, self.critic_target)
 
 		actor_action = self.actor_local(states)
 		q_actions = self.get_q_value(states, actor_action, grad=True, probs=True)
-		q_actions = actor_action*q_actions if self.discrete else q_actions
-		q_baseline = q_values.mean(-1, keepdim=True) if self.discrete else q_values
+		q_actions = (actor_action*q_actions).sum(-1) if self.discrete else q_actions
+		q_baseline = q_targets if self.discrete else q_values
 		actor_loss = -(q_actions - q_baseline.detach())
 		self.step(self.actor_optimizer, actor_loss.mean())
 		self.soft_copy(self.actor_local, self.actor_target)
@@ -95,8 +94,8 @@ class DDPGAgent(PTACAgent):
 			states, actions, rewards, dones = map(self.to_tensor, zip(*self.buffer))
 			self.buffer.clear()	
 			states = torch.cat([states, self.to_tensor(next_state).unsqueeze(0)], dim=0)
-			actions = torch.cat([actions, self.network.get_action(states[-1], use_target=True, numpy=False).unsqueeze(0)], dim=0)
-			values = self.network.get_q_value(states, actions, use_target=True, numpy=False)
+			actions = torch.cat([actions, self.network.get_action(states[-1], use_target=True).unsqueeze(0)], dim=0)
+			values = self.network.get_q_value(states, actions, use_target=True)
 			targets = self.compute_gae(values[-1], rewards.unsqueeze(-1), dones.unsqueeze(-1), values[:-1])[0]
 			states, actions, targets = [x.view(x.size(0)*x.size(1), *x.size()[2:]).cpu().numpy() for x in (states[:-1], actions[:-1], targets)]
 			self.replay_buffer.extend(list(zip(states, actions, targets)), shuffle=False)	
