@@ -17,5 +17,8 @@ module load mpi/openmpi-4.0
 # Load Anaconda module
 module load anaconda/2020a
 
+export DISPLAY=':99.0'
+Xvfb :99 -screen 0 1400x900x24 > /dev/null 2>&1 &
+
 # Call your script as you would from the command line
-mpirun python -B train_a3c.py --model ppo --steps 500000
+mpirun python -B train_a3c.py --env_name CarRacing-v0 --model ppo --iter 1 --steps 500000
