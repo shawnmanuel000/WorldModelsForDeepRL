@@ -54,9 +54,9 @@ def parse_args(all_envs, all_models):
 
 if __name__ == "__main__":
 	args = parse_args(all_envs, all_models.keys())
-	checkpoint = f"{args.env_name}/pytorch" if args.iternum < 0 else f"{args.env_name}/iter{args.iternum}/"
+	checkpoint = f"{args.env_name}/pytorch" if args.iternum < 0 else f"{args.env_name}/iter{args.iternum}"
 	rank, size = set_rank_size(args.tcp_rank, args.tcp_ports)
-	get_env = lambda: make_env(args.env_name)
+	get_env = lambda: make_env(args.env_name, args.render)
 	model = all_models[args.model]
 	if rank>0:
 		EnvWorker(make_env=get_env).start()

@@ -70,7 +70,7 @@ class EnvWorker():
 				rewards[int(train)] = np.array(reward) if rewards[int(train)] is None else rewards[int(train)] + np.array(reward)
 				message = (state, reward, done, info)
 				step += int(train)
-				if train and np.all(done): 
+				if np.all(done): 
 					print(f"{'Train' if train else 'Test'} Step: {step}, Reward: {rewards[int(train)]}")
 					rewards[int(train)] = None
 			elif data["cmd"] == "RENDER":

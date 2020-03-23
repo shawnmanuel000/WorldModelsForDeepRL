@@ -7,7 +7,7 @@ from models.worldmodel.mdrnn import MDRNNCell, HIDDEN_SIZE
 from utils.rand import RandomAgent
 from utils.misc import IMG_DIM
 
-FRAME_STACK = 2					# The number of consecutive image states to combine for training a3c on raw images
+FRAME_STACK = 3					# The number of consecutive image states to combine for training a3c on raw images
 NUM_ENVS = 16					# The default number of environments to simultaneously train the a3c in parallel
 
 class RawStack():

@@ -65,9 +65,10 @@ class ControlAgent(RandomAgent):
 		return action
 
 	def get_env_action(self, env, state, eps=None, sample=False):
+		batch = len(state.shape) > len(self.state_size)
 		env_action, action = super().get_env_action(env, state, eps)
 		self.world_model.step(self.latent, env_action)
-		return env_action, action
+		return [x if batch else x[0] for x in [env_action, action]]
 
 	def set_params(self, params):
 		self.network.set_params(params)

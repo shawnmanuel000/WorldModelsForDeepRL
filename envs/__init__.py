@@ -26,13 +26,13 @@ vzd_envs = [
 
 all_envs = [*gym_envs, *vzd_envs]
 env_names = [vzd_envs[-2], vzd_envs[-1], gym_envs[5]]
-env_name = env_names[0]
+env_name = env_names[1]
 
-def make_env(env_name=env_name):
+def make_env(env_name=env_name, render=False):
 	env = None
 	if env_name in gym_envs:
 		env = GymEnv(gym.make(env_name))
 		env.unwrapped.verbose = 0
 	elif env_name in vzd_envs:
-		env = VizDoomEnv(env_name)
+		env = VizDoomEnv(env_name, render=render)
 	return env
