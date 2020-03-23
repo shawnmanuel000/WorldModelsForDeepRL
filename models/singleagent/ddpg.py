@@ -2,7 +2,7 @@ import torch
 import random
 import numpy as np
 from utils.rand import RandomAgent, PrioritizedReplayBuffer, ReplayBuffer
-from utils.network import PTACNetwork, PTACAgent, Conv, INPUT_LAYER, ACTOR_HIDDEN, CRITIC_HIDDEN, LEARN_RATE, REPLAY_BATCH_SIZE, TARGET_UPDATE_RATE, NUM_STEPS, EPS_DECAY, EPS_MIN, gsoftmax, one_hot
+from utils.network import PTACNetwork, PTACAgent, PTCritic, Conv, INPUT_LAYER, ACTOR_HIDDEN, CRITIC_HIDDEN, LEARN_RATE, REPLAY_BATCH_SIZE, TARGET_UPDATE_RATE, NUM_STEPS, EPS_DECAY, EPS_MIN, gsoftmax, one_hot
 
 class DDPGActor(torch.nn.Module):
 	def __init__(self, state_size, action_size):
@@ -46,28 +46,34 @@ class DDPGCritic(torch.nn.Module):
 
 class DDPGNetwork(PTACNetwork):
 	def __init__(self, state_size, action_size, actor=DDPGActor, critic=DDPGCritic, lr=LEARN_RATE, tau=TARGET_UPDATE_RATE, gpu=True, load=None, name="ddpg"): 
-		super().__init__(state_size, action_size, actor=actor, critic=critic, lr=lr, tau=tau, gpu=gpu, load=load, name=name)
+		self.discrete = type(action_size)!=tuple
+		super().__init__(state_size, action_size, actor, critic if not self.discrete else lambda s,a: PTCritic(s,a), lr=lr, tau=tau, gpu=gpu, load=load, name=name)
 
-	def get_action(self, state, use_target=False, grad=False, numpy=True, sample=True):
+	def get_action(self, state, use_target=False, grad=False, numpy=False, sample=True):
 		with torch.enable_grad() if grad else torch.no_grad():
 			actor = self.actor_local if not use_target else self.actor_target
 			return actor(state, sample).cpu().numpy() if numpy else actor(state, sample)
 
-	def get_q_value(self, state, action, use_target=False, grad=False, numpy=True):
+	def get_q_value(self, state, action, use_target=False, grad=False, numpy=False, probs=False):
 		with torch.enable_grad() if grad else torch.no_grad():
 			critic = self.critic_local if not use_target else self.critic_target
-			return critic(state, action).cpu().numpy() if numpy else critic(state, action)
+			q_value = critic(state) if self.discrete else critic(state, action)
+			q_value = q_value.gather(-1, action.argmax(-1, keepdim=True)) if self.discrete and not probs else q_value
+			return q_value.cpu().numpy() if numpy else q_value
 	
 	def optimize(self, states, actions, q_targets, importances=1.0):
-		if self.actor_local.discrete: actions = one_hot(actions)
-		q_values = self.critic_local(states, actions)
-		critic_loss = (q_values - q_targets.detach()).pow(2)
+		actions = one_hot(actions) if self.actor_local.discrete else actions
+		q_values = self.get_q_value(states, actions, grad=True, probs=True)
+		q_taken = q_values.gather(-1, actions.argmax(-1, keepdim=True)) if self.discrete else q_values
+		critic_loss = (q_taken - q_targets.detach()).pow(2)
 		self.step(self.critic_optimizer, critic_loss.mean())
 		self.soft_copy(self.critic_local, self.critic_target)
 
 		actor_action = self.actor_local(states)
-		q_actions = self.critic_local(states, actor_action)
-		actor_loss = -(q_actions - q_values.detach())
+		q_actions = self.get_q_value(states, actor_action, grad=True, probs=True)
+		q_actions = actor_action*q_actions if self.discrete else q_actions
+		q_baseline = q_values.mean(-1, keepdim=True) if self.discrete else q_values
+		actor_loss = -(q_actions - q_baseline.detach())
 		self.step(self.actor_optimizer, actor_loss.mean())
 		self.soft_copy(self.actor_local, self.actor_target)
 		
@@ -79,7 +85,7 @@ class DDPGAgent(PTACAgent):
 		eps = self.eps if eps is None else eps
 		action_random = super().get_action(state, eps)
 		if self.discrete and random.random() < eps: return action_random
-		action_greedy = self.network.get_action(self.to_tensor(state), sample=sample)
+		action_greedy = self.network.get_action(self.to_tensor(state), numpy=True, sample=sample)
 		action = np.clip((1-eps)*action_greedy + eps*action_random, -1, 1)
 		return action
 		

@@ -82,11 +82,11 @@ def run(load_dirname, gpu=True, iterations=1):
 	env.close()
 
 if __name__ == "__main__":
-	dirname = f"{env_name}/pytorch" if args.iternum < 0 else f"{env_name}/iter{args.iternum}/"
+	dirname = f"{env_name}/pytorch" if args.iternum < 0 else f"{env_name}/iter{args.iternum}"
 	rank, size = set_rank_size(args.tcp_rank, args.tcp_ports)
 	if rank>0:
 		ControllerWorker().start(load_dirname=dirname, gpu=True, iterations=1)
 	elif rank==0 and size>1:
-		ControllerManager().start(ports=list(range(1,size)) , save_dirname=dirname, epochs=500, popsize=64)
+		ControllerManager().start(ports=list(range(1,size)), save_dirname=dirname, epochs=500, popsize=64)
 	else:
 		run(dirname, gpu=False)
