@@ -1,0 +1,158 @@
+Model: <class 'models.worldmodel.controller.Controller'>, Env: take_cover/iter1, Date: 22/03/2020 22:48:12
+CPU: 8 Core, 5.0GHz, 62.66 GB, Linux-5.3.0-42-generic-x86_64-with-Ubuntu-18.04-bionic
+GPU 0: GeForce RTX 2070, 7.98 GB (Driver: 440.64.00)
+Git URL: git@github.com:shawnmanuel000/WorldModelsForDeepRL.git
+Hash: b19ecc9d85ff967409939649e274f3782e65a659
+Branch: master
+
+popsize: 64,
+restarts: 1,
+
+import os
+import torch
+import numpy as np
+from utils.rand import RandomAgent
+from utils.wrappers import WorldModel
+from models.worldmodel.vae import LATENT_SIZE
+from models.worldmodel.mdrnn import HIDDEN_SIZE, ACTION_SIZE
+
+class ControlActor(torch.nn.Module):
+	def __init__(self, state_size, action_size):
+		super().__init__()
+		self.linear = torch.nn.Linear(state_size[-1], action_size[-1])
+		self.apply(lambda m: torch.nn.init.xavier_normal_(m.weight) if type(m) == torch.nn.Linear else None)
+
+	def forward(self, state):
+		action = self.linear(state)
+		return action
+
+class Controller():
+	def __init__(self, state_size=[LATENT_SIZE+HIDDEN_SIZE], action_size=[ACTION_SIZE], gpu=True, load=""):
+		super().__init__()
+		self.device = torch.device('cuda' if gpu and torch.cuda.is_available() else 'cpu')
+		self.actor_local = ControlActor(state_size, action_size).to(self.device)
+		if load: self.load_model(load)
+
+	def get_action(self, state):
+		with torch.no_grad():
+			action = self.actor_local(state.to(self.device)).clamp(-1, 1)
+			return action.cpu().numpy()
+
+	def get_params(self):
+		params = [p.view(-1) for p in self.actor_local.parameters()]
+		params = torch.cat(params, dim=0)
+		return params.cpu().detach().numpy()
+
+	def set_params(self, params):
+		numels = [p.numel() for p in self.actor_local.parameters()]
+		starts = np.cumsum([0] + numels)
+		params = [params[s:starts[i+1]] for i,s in enumerate(starts[:-1])]
+		for p,d in zip(self.actor_local.parameters(), params):
+			p.data.copy_(torch.Tensor(d).view(p.size()))
+		return self
+
+	def save_model(self, dirname="pytorch", name="best"):
+		filepath = get_checkpoint_path(dirname, name)
+		os.makedirs(os.path.dirname(filepath), exist_ok=True)
+		torch.save(self.actor_local.state_dict(), filepath)
+		
+	def load_model(self, dirname="pytorch", name="best"):
+		filepath = get_checkpoint_path(dirname, name)
+		if os.path.exists(filepath):
+			self.actor_local.load_state_dict(torch.load(filepath, map_location=self.device))
+			print(f"Loaded CTRL model at {filepath}")
+		return self
+
+class ControlAgent(RandomAgent):
+	def __init__(self, state_size, action_size, gpu=True, load=""):
+		super().__init__(state_size, action_size)
+		self.world_model = WorldModel(state_size, action_size, num_envs=1, load=load, gpu=gpu)
+		self.network = Controller(self.world_model.state_size, action_size, gpu=gpu, load=load)
+
+	def get_action(self, state, eps=None, sample=True):
+		state, self.latent = self.world_model.get_state(state, numpy=False)
+		action = self.network.get_action(state)
+		return action
+
+	def get_env_action(self, env, state, eps=None, sample=False):
+		batch = len(state.shape) > len(self.state_size)
+		env_action, action = super().get_env_action(env, state, eps)
+		self.world_model.step(self.latent, env_action)
+		return [x if batch else x[0] for x in [env_action, action]]
+
+	def set_params(self, params):
+		self.network.set_params(params)
+		return self
+
+	def save_model(self, dirname="pytorch", name="best"):
+		self.network.save_model(dirname, name)
+
+	def load_model(self, dirname="pytorch", name="best"):
+		self.world_model.load_model(dirname, name)
+		self.network.load_model(dirname, name)
+		return self
+
+def get_checkpoint_path(dirname="pytorch", name="best"):
+	return f"./saved_models/controller/{dirname}/{name}.pth"
+
+Ep: 0-499, Best score: 679.0000, Min: 101.0000, Avg: 260.7188, Rolling: 260.7188 <0-00:00:00> 
+Ep: 0-498, Best score: 533.0000, Min: 102.0000, Avg: 250.4375, Rolling: 255.5781 <0-00:01:11> 
+Ep: 0-497, Best score: 465.0000, Min: 105.0000, Avg: 251.2344, Rolling: 254.1302 <0-00:02:48> 
+Ep: 0-496, Best score: 724.0000, Min: 95.0000, Avg: 258.2969, Rolling: 255.1719 <0-00:04:18> 
+Ep: 0-495, Best score: 500.0000, Min: 104.0000, Avg: 238.1562, Rolling: 251.7688 <0-00:05:47> 
+Ep: 0-494, Best score: 522.0000, Min: 94.0000, Avg: 259.3594, Rolling: 253.0339 <0-00:07:38> 
+Ep: 0-493, Best score: 602.0000, Min: 100.0000, Avg: 275.4219, Rolling: 256.2321 <0-00:09:38> 
+Ep: 0-492, Best score: 620.0000, Min: 97.0000, Avg: 253.5469, Rolling: 255.8965 <0-00:11:51> 
+Ep: 0-491, Best score: 574.0000, Min: 95.0000, Avg: 289.0000, Rolling: 259.5747 <0-00:15:52> 
+Ep: 0-490, Best score: 523.0000, Min: 99.0000, Avg: 272.9375, Rolling: 260.9109 <0-00:19:27> 
+Ep: 0-489, Best score: 535.0000, Min: 96.0000, Avg: 256.0000, Rolling: 260.4645 <0-00:22:44> 
+Ep: 0-488, Best score: 675.0000, Min: 98.0000, Avg: 283.5312, Rolling: 262.3867 <0-00:26:20> 
+Ep: 0-487, Best score: 752.0000, Min: 119.0000, Avg: 292.2812, Rolling: 264.6863 <0-00:30:32> 
+Ep: 0-486, Best score: 631.0000, Min: 104.0000, Avg: 262.8125, Rolling: 264.5525 <0-00:34:33> 
+Ep: 0-485, Best score: 624.0000, Min: 93.0000, Avg: 287.3438, Rolling: 266.0719 <0-00:40:03> 
+Ep: 0-484, Best score: 966.0000, Min: 112.0000, Avg: 311.9531, Rolling: 268.9395 <0-00:45:07> 
+Ep: 0-483, Best score: 595.0000, Min: 99.0000, Avg: 273.5625, Rolling: 269.2114 <0-00:50:50> 
+Ep: 0-482, Best score: 991.0000, Min: 103.0000, Avg: 302.7344, Rolling: 271.0738 <0-00:55:36> 
+Ep: 0-481, Best score: 748.0000, Min: 100.0000, Avg: 321.0938, Rolling: 273.7064 <0-01:01:53> 
+Ep: 0-480, Best score: 643.0000, Min: 106.0000, Avg: 277.9688, Rolling: 273.9195 <0-01:05:26> 
+Ep: 0-479, Best score: 650.0000, Min: 107.0000, Avg: 281.1406, Rolling: 274.2634 <0-01:10:52> 
+Ep: 0-478, Best score: 789.0000, Min: 95.0000, Avg: 295.7344, Rolling: 275.2393 <0-01:16:50> 
+Ep: 0-477, Best score: 476.0000, Min: 98.0000, Avg: 252.9375, Rolling: 274.2697 <0-01:21:17> 
+Ep: 0-476, Best score: 573.0000, Min: 98.0000, Avg: 274.4531, Rolling: 274.2773 <0-01:26:50> 
+Ep: 0-475, Best score: 963.0000, Min: 104.0000, Avg: 295.8125, Rolling: 275.1388 <0-01:32:33> 
+Ep: 0-474, Best score: 693.0000, Min: 97.0000, Avg: 279.4375, Rolling: 275.3041 <0-01:38:07> 
+Ep: 0-473, Best score: 609.0000, Min: 104.0000, Avg: 281.0625, Rolling: 275.5174 <0-01:43:19> 
+Ep: 0-472, Best score: 1136.0000, Min: 112.0000, Avg: 300.3438, Rolling: 276.4040 <0-01:49:37> 
+Ep: 0-471, Best score: 705.0000, Min: 91.0000, Avg: 329.3125, Rolling: 278.2284 <0-01:55:50> 
+Ep: 0-470, Best score: 831.0000, Min: 110.0000, Avg: 293.3594, Rolling: 278.7328 <0-02:01:09> 
+Ep: 0-469, Best score: 666.0000, Min: 92.0000, Avg: 289.4219, Rolling: 279.0776 <0-02:06:26> 
+Ep: 0-468, Best score: 551.0000, Min: 98.0000, Avg: 287.0312, Rolling: 279.3262 <0-02:11:37> 
+Ep: 0-467, Best score: 705.0000, Min: 96.0000, Avg: 313.6250, Rolling: 280.3655 <0-02:17:45> 
+Ep: 0-466, Best score: 586.0000, Min: 101.0000, Avg: 291.8281, Rolling: 280.7027 <0-02:23:46> 
+Ep: 0-465, Best score: 526.0000, Min: 102.0000, Avg: 290.1562, Rolling: 280.9728 <0-02:29:41> 
+Ep: 0-464, Best score: 582.0000, Min: 107.0000, Avg: 282.5156, Rolling: 281.0156 <0-02:33:38> 
+Ep: 0-463, Best score: 1055.0000, Min: 99.0000, Avg: 298.4375, Rolling: 281.4865 <0-02:37:04> 
+Ep: 0-462, Best score: 841.0000, Min: 114.0000, Avg: 303.6094, Rolling: 282.0687 <0-02:40:49> 
+Ep: 0-461, Best score: 628.0000, Min: 101.0000, Avg: 294.6875, Rolling: 282.3922 <0-02:44:20> 
+Ep: 0-460, Best score: 726.0000, Min: 114.0000, Avg: 311.6562, Rolling: 283.1238 <0-02:47:58> 
+Ep: 0-459, Best score: 752.0000, Min: 114.0000, Avg: 290.8125, Rolling: 283.3114 <0-02:51:05> 
+Ep: 0-458, Best score: 652.0000, Min: 111.0000, Avg: 308.6250, Rolling: 283.9141 <0-02:54:43> 
+Ep: 0-457, Best score: 815.0000, Min: 94.0000, Avg: 290.8281, Rolling: 284.0749 <0-02:57:50> 
+Ep: 0-456, Best score: 895.0000, Min: 100.0000, Avg: 314.2031, Rolling: 284.7596 <0-03:01:35> 
+Ep: 0-455, Best score: 1006.0000, Min: 94.0000, Avg: 319.4531, Rolling: 285.5306 <0-03:05:14> 
+Ep: 0-454, Best score: 1025.0000, Min: 117.0000, Avg: 351.1562, Rolling: 286.9572 <0-03:09:25> 
+Ep: 0-453, Best score: 754.0000, Min: 96.0000, Avg: 325.6875, Rolling: 287.7812 <0-03:13:22> 
+Ep: 0-452, Best score: 793.0000, Min: 98.0000, Avg: 303.9375, Rolling: 288.1178 <0-03:16:51> 
+Ep: 0-451, Best score: 781.0000, Min: 99.0000, Avg: 293.2188, Rolling: 288.2219 <0-03:20:24> 
+Ep: 0-450, Best score: 857.0000, Min: 95.0000, Avg: 309.3594, Rolling: 288.6447 <0-03:24:30> 
+Ep: 0-449, Best score: 1117.0000, Min: 105.0000, Avg: 307.9375, Rolling: 289.0230 <0-03:27:56> 
+Ep: 0-448, Best score: 633.0000, Min: 98.0000, Avg: 266.3594, Rolling: 288.5871 <0-03:31:22> 
+Ep: 0-447, Best score: 731.0000, Min: 92.0000, Avg: 278.9062, Rolling: 288.4045 <0-03:34:37> 
+Ep: 0-446, Best score: 718.0000, Min: 106.0000, Avg: 247.0469, Rolling: 287.6386 <0-03:37:39> 
+Ep: 0-445, Best score: 768.0000, Min: 119.0000, Avg: 329.3906, Rolling: 288.3977 <0-03:41:18> 
+Ep: 0-444, Best score: 724.0000, Min: 98.0000, Avg: 308.7969, Rolling: 288.7620 <0-03:45:02> 
+Ep: 0-443, Best score: 624.0000, Min: 97.0000, Avg: 293.2500, Rolling: 288.8407 <0-03:48:19> 
+Ep: 0-442, Best score: 661.0000, Min: 104.0000, Avg: 286.8750, Rolling: 288.8068 <0-03:51:51> 
+Ep: 0-441, Best score: 701.0000, Min: 99.0000, Avg: 291.5312, Rolling: 288.8530 <0-03:55:04> 
+Ep: 0-440, Best score: 823.0000, Min: 96.0000, Avg: 322.3906, Rolling: 289.4120 <0-03:58:48> 
+Ep: 0-439, Best score: 985.0000, Min: 108.0000, Avg: 313.7656, Rolling: 289.8112 <0-04:02:26> 

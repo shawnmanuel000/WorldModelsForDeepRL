@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 from utils.rand import ReplayBuffer, PrioritizedReplayBuffer
-from utils.network import PTACNetwork, PTACAgent, Conv, INPUT_LAYER, ACTOR_HIDDEN, CRITIC_HIDDEN, LEARN_RATE, DISCOUNT_RATE, NUM_STEPS, ADVANTAGE_DECAY, one_hot_from_indices
+from utils.network import PTACNetwork, PTACAgent, Conv, INPUT_LAYER, ACTOR_HIDDEN, CRITIC_HIDDEN, LEARN_RATE, DISCOUNT_RATE, NUM_STEPS, one_hot_from_indices
 
 BATCH_SIZE = 32					# Number of samples to train on for each train step
 PPO_EPOCHS = 2					# Number of iterations to sample batches for training
@@ -18,18 +18,20 @@ class PPOActor(torch.nn.Module):
 		self.action_mu = torch.nn.Linear(ACTOR_HIDDEN, action_size[-1])
 		self.action_sig = torch.nn.Parameter(torch.zeros(action_size[-1]))
 		self.apply(lambda m: torch.nn.init.xavier_normal_(m.weight) if type(m) in [torch.nn.Conv2d, torch.nn.Linear] else None)
+		self.dist = lambda m,s: torch.distributions.Categorical(m.softmax(-1)) if self.discrete else torch.distributions.Normal(m,s)
 		
-	def forward(self, state, action=None, sample=True):
+	def forward(self, state, action_in=None, sample=True):
 		state = self.layer1(state).relu()
 		state = self.layer2(state).relu()
 		state = self.layer3(state).relu()
 		action_mu = self.action_mu(state)
 		action_sig = self.action_sig.exp().expand_as(action_mu)
-		dist = torch.distributions.Normal(action_mu, action_sig)
-		action = dist.sample() if action is None else action
+		dist = self.dist(action_mu, action_sig)
+		action = dist.sample() if action_in is None else action_in.argmax(-1) if self.discrete else action_in
+		action_out = one_hot_from_indices(action, action_mu.size(-1)) if self.discrete else action
 		log_prob = dist.log_prob(action)
 		entropy = dist.entropy()
-		return action, log_prob, entropy
+		return action_out, log_prob, entropy
 
 class PPOCritic(torch.nn.Module):
 	def __init__(self, state_size, action_size):

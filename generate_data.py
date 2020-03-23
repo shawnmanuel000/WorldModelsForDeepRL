@@ -1,6 +1,7 @@
 import os
 import gym
 import cv2
+import time
 import torch
 import random
 import argparse
@@ -13,8 +14,8 @@ from models.worldmodel.controller import ControlAgent
 import matplotlib.pyplot as plt
 
 parser = argparse.ArgumentParser(description="Rollout Generator")
-parser.add_argument("--nsamples", type=int, default=1, help="How many rollouts to save")
-parser.add_argument("--iternum", type=int, default=1, choices=[0,1], help="Which iteration of trained World Model to load (0 or 1)")
+parser.add_argument("--nsamples", type=int, default=0, help="How many rollouts to save")
+parser.add_argument("--iternum", type=int, default=0, choices=[0,1], help="Which iteration of trained World Model to load (0 or 1)")
 parser.add_argument("--datadir", type=str, default=ROOT, help="The directory path to save the sampled rollouts")
 args = parser.parse_args()
 
@@ -53,7 +54,7 @@ def sample(runs, iternum, root=ROOT, number=None):
 	env = make_env()
 	state_size = env.observation_space.shape
 	action_size = [env.action_space.n] if hasattr(env.action_space, 'n') else env.action_space.shape
-	agent = RandomAgent(state_size, action_size) if iternum <= 0 else ControlAgent(state_size, action_size, gpu=False, load=f"{env_name}/iter{iternum-1}/")
+	agent = RandomAgent(state_size, action_size) if iternum <= 0 else ControlAgent(state_size, action_size, gpu=False, load=f"{env_name}/iter{iternum-1}")
 	for ep in range(runs):
 		state = env.reset()
 		total_reward = 0
@@ -68,13 +69,14 @@ def sample(runs, iternum, root=ROOT, number=None):
 	env.close()
 
 def check_samples(iternum, root=ROOT):
-	dirname = f"iter{iternum}/"
-	if os.path.exists(os.path.join(root, dirname)):
-		files = [os.path.join(root, dirname, n) for n in sorted(os.listdir(os.path.join(root, dirname)), key=lambda x: str(len(x))+x)]
+	dirname = os.path.join(root, f"iter{iternum}/")
+	if os.path.exists(dirname):
+		files = [os.path.join(root, dirname, n) for n in sorted(os.listdir(dirname), key=lambda x: str(len(x))+x)]
 		for i,f in enumerate(files):
 			with np.load(f) as data:
-				size = data["states"].shape[0]
-			if size != 1000:
+				size = data["rewards"].shape[0]
+				print(data["states"].shape, data["actions"].shape, data["rewards"].shape)
+			if size <= 1:
 				print(f"{f}: {size}")
 				sample(1, iternum, number=i)
 				check_samples(iternum)

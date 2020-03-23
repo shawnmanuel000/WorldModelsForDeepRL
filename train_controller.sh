@@ -1,6 +1,7 @@
 
 numWorkers=$1
 iterNum=$2
+baseport=$3
 
 # echo "Iter $iterNum for $numWorkers workers"
 

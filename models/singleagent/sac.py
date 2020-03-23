@@ -49,7 +49,7 @@ class SACCritic(torch.nn.Module):
 class SACNetwork(PTACNetwork):
 	def __init__(self, state_size, action_size, actor=SACActor, critic=SACCritic, lr=LEARN_RATE, tau=TARGET_UPDATE_RATE, gpu=True, load=None, name="sac"):
 		self.discrete = type(action_size)!=tuple
-		super().__init__(state_size, action_size, actor, SACCritic if not self.discrete else lambda s,a: PTCritic(s,a), lr=lr, tau=tau, gpu=gpu, load=load, name=name)
+		super().__init__(state_size, action_size, actor, critic if not self.discrete else lambda s,a: PTCritic(s,a), lr=lr, tau=tau, gpu=gpu, load=load, name=name)
 		self.log_alpha = torch.nn.Parameter(torch.zeros(1, requires_grad=True).to(self.device))
 		self.alpha_optimizer = torch.optim.Adam([self.log_alpha], lr=lr)
 		self.target_entropy = -np.product(action_size)

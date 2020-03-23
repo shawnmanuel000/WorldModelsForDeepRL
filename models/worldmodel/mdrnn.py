@@ -29,7 +29,7 @@ class MDRNN(torch.nn.Module):
 		if load: self.load_model(load)
 
 	def forward(self, actions, latents):
-		if self.discrete: actions = one_hot_from_indices(actions, self.action_size[-1], keepdims=True)
+		if self.discrete: actions = one_hot_from_indices(actions, self.action_size[-1], keepdims=True).view(*latents.shape[:2], -1)
 		if len(actions.shape) != len(latents.shape):
 			print(actions.shape, latents.shape)
 		lstm_inputs = torch.cat([actions, latents], dim=-1)
@@ -101,7 +101,7 @@ class MDRNNCell(torch.nn.Module):
 	def forward(self, actions, latents, hiddens):
 		with torch.no_grad():
 			actions, latents = [x.to(self.device) for x in (torch.from_numpy(actions), latents)]
-			if self.discrete: actions = one_hot_from_indices(actions, self.action_size[-1], keepdims=True)
+			if self.discrete: actions = one_hot_from_indices(actions, self.action_size[-1], keepdims=True).view(*latents.shape[:-1], -1)
 			lstm_inputs = torch.cat([actions, latents], dim=-1)
 			lstm_hidden = self.lstm(lstm_inputs, hiddens)
 			return lstm_hidden
