@@ -1,0 +1,271 @@
+Model: <class 'models.singleagent.sac.SACAgent'>, Env: CarRacing-v0/iter1, Date: 23/03/2020 23:03:44
+CPU: 20 Core, 0.0GHz, 377.59 GB, Linux-4.14.167-llgrid-10ms-x86_64-with-debian-buster-sid
+GPU 0: Tesla V100-PCIE-32GB, 32.51 GB (Driver: 440.33.01)
+Git URL: git@github.com:shawnmanuel000/WorldModelsForDeepRL.git
+Hash: bdf3edfce3f9915e7fed852cdd58b3287d3412d7
+Branch: master
+
+num_envs: 16,
+state_size: (96, 96, 3),
+action_size: (3,),
+action_space: Box(3,),
+envs: <class 'utils.envs.EnvManager'>,
+statemodel: <utils.wrappers.WorldModel object at 0x7f0630092b38>,
+
+import torch
+import numpy as np
+from utils.rand import ReplayBuffer
+from utils.network import PTACNetwork, PTACAgent, PTCritic, LEARN_RATE, REPLAY_BATCH_SIZE, TARGET_UPDATE_RATE, INPUT_LAYER, ACTOR_HIDDEN, CRITIC_HIDDEN, Conv, EPS_DECAY, DISCOUNT_RATE, gsoftmax
+
+class SACActor(torch.nn.Module):
+	def __init__(self, state_size, action_size):
+		super().__init__()
+		self.discrete = type(action_size) != tuple
+		self.layer1 = torch.nn.Linear(state_size[-1], INPUT_LAYER) if len(state_size)!=3 else Conv(state_size, INPUT_LAYER)
+		self.layer2 = torch.nn.Linear(INPUT_LAYER, ACTOR_HIDDEN)
+		self.layer3 = torch.nn.Linear(ACTOR_HIDDEN, ACTOR_HIDDEN)
+		self.action_mu = torch.nn.Linear(ACTOR_HIDDEN, action_size[-1])
+		self.action_sig = torch.nn.Linear(ACTOR_HIDDEN, action_size[-1])
+		self.apply(lambda m: torch.nn.init.xavier_normal_(m.weight) if type(m) in [torch.nn.Conv2d, torch.nn.Linear] else None)
+		self.dist = lambda m,s: torch.distributions.Categorical(m.softmax(-1)) if self.discrete else torch.distributions.Normal(m,s)
+		
+	def forward(self, state, action=None, sample=True):
+		state = self.layer1(state).relu()
+		state = self.layer2(state).relu()
+		state = self.layer3(state).relu()
+		action_mu = self.action_mu(state)
+		action_sig = self.action_sig(state).clamp(-5,0).exp()
+		dist = torch.distributions.Normal(action_mu, action_sig)
+		action = dist.rsample() if sample else action_mu
+		action_out = gsoftmax(action_mu, hard=False) if self.discrete else action.tanh()
+		log_prob = torch.log(action_out+1e-6) if self.discrete else dist.log_prob(action)-torch.log(1-action_out.pow(2)+1e-6)
+		return action_out, log_prob
+
+class SACCritic(torch.nn.Module):
+	def __init__(self, state_size, action_size):
+		super().__init__()
+		self.net_state = torch.nn.Linear(state_size[-1], INPUT_LAYER) if len(state_size)!=3 else Conv(state_size, INPUT_LAYER)
+		self.net_action = torch.nn.Linear(action_size[-1], INPUT_LAYER)
+		self.net_layer1 = torch.nn.Linear(2*INPUT_LAYER, CRITIC_HIDDEN)
+		self.net_layer2 = torch.nn.Linear(CRITIC_HIDDEN, CRITIC_HIDDEN)
+		self.q_value = torch.nn.Linear(CRITIC_HIDDEN, 1)
+		self.apply(lambda m: torch.nn.init.xavier_normal_(m.weight) if type(m) in [torch.nn.Conv2d, torch.nn.Linear] else None)
+
+	def forward(self, state, action):
+		state = self.net_state(state).relu()
+		net_action = self.net_action(action).relu()
+		net_layer = torch.cat([state, net_action], dim=-1)
+		net_layer = self.net_layer1(net_layer).relu()
+		net_layer = self.net_layer2(net_layer).relu()
+		q_value = self.q_value(net_layer)
+		return q_value
+
+class SACNetwork(PTACNetwork):
+	def __init__(self, state_size, action_size, actor=SACActor, critic=SACCritic, lr=LEARN_RATE, tau=TARGET_UPDATE_RATE, gpu=True, load=None, name="sac"):
+		self.discrete = type(action_size)!=tuple
+		super().__init__(state_size, action_size, actor, critic if not self.discrete else lambda s,a: PTCritic(s,a), lr=lr, tau=tau, gpu=gpu, load=load, name=name)
+		self.log_alpha = torch.nn.Parameter(torch.zeros(1, requires_grad=True).to(self.device))
+		self.alpha_optimizer = torch.optim.Adam([self.log_alpha], lr=lr)
+		self.target_entropy = -np.product(action_size)
+
+	def get_action_probs(self, state, action_in=None, grad=False, numpy=False, sample=True):
+		with torch.enable_grad() if grad else torch.no_grad():
+			action, log_prob = self.actor_local(state.to(self.device), action_in, sample)
+			return [x.cpu().numpy() if numpy else x for x in [action, log_prob]]
+
+	def get_q_value(self, state, action, use_target=False, grad=False, numpy=False, probs=False):
+		with torch.enable_grad() if grad else torch.no_grad():
+			critic = self.critic_local if not use_target else self.critic_target
+			q_value = critic(state) if self.discrete else critic(state, action)
+			return q_value.cpu().numpy() if numpy else q_value
+	
+	def optimize(self, states, actions, targets, next_log_probs, dones, gamma=DISCOUNT_RATE):
+		alpha = self.log_alpha.clamp(-5, 0).detach().exp()
+		if not self.discrete: next_log_probs = next_log_probs.sum(-1, keepdim=True)
+		q_targets = targets - gamma*alpha*next_log_probs*(1-dones.unsqueeze(-1))
+		q_targets = (actions*q_targets).sum(-1, keepdim=True) if self.discrete else q_targets
+
+		q_values = self.get_q_value(states, actions, grad=True)
+		q_values = q_values.gather(-1, actions.argmax(-1, keepdim=True)) if self.discrete else q_values
+		critic1_loss = (q_values - q_targets.detach()).pow(2)
+		self.step(self.critic_optimizer, critic1_loss.mean(), self.critic_local.parameters())
+		self.soft_copy(self.critic_local, self.critic_target)
+
+		actor_action, log_prob = self.actor_local(states)
+		q_actions = self.get_q_value(states, actor_action, grad=True)
+		q_baseline = q_targets if self.discrete else q_values
+		actor_loss = alpha*log_prob - (q_actions - q_baseline.detach())
+		actor_loss = actor_action*actor_loss if self.discrete else actor_loss
+		self.step(self.actor_optimizer, actor_loss.mean(), self.actor_local.parameters())
+		
+		log_prob = (actor_action*log_prob).sum(-1) if self.discrete else log_prob
+		alpha_loss = -(self.log_alpha * (log_prob.detach() + self.target_entropy))
+		self.step(self.alpha_optimizer, alpha_loss.mean())
+
+class SACAgent(PTACAgent):
+	def __init__(self, state_size, action_size, decay=EPS_DECAY, lr=LEARN_RATE, gpu=True, load=None):
+		super().__init__(state_size, action_size, SACNetwork, decay=decay, lr=lr, gpu=gpu, load=load)
+
+	def get_action(self, state, eps=None, sample=True, e_greedy=False):
+		action, self.log_prob = self.network.get_action_probs(self.to_tensor(state), numpy=True, sample=sample)
+		return action
+		
+	def train(self, state, action, next_state, reward, done):
+		self.buffer.append((state, action, self.log_prob, reward, done))
+		if np.any(done[0]) or len(self.buffer) >= self.update_freq:
+			states, actions, log_probs, rewards, dones = map(self.to_tensor, zip(*self.buffer))
+			self.buffer.clear()	
+			states = torch.cat([states, self.to_tensor(next_state).unsqueeze(0)], dim=0)
+			next_action, next_log_prob = self.network.get_action_probs(states[-1])
+			actions = torch.cat([actions, next_action.unsqueeze(0)], dim=0)
+			log_probs = torch.cat([log_probs, next_log_prob.unsqueeze(0)], dim=0)
+			values = self.network.get_q_value(states, actions, use_target=True)
+			targets = self.compute_gae(values[-1], rewards.unsqueeze(-1), dones.unsqueeze(-1), values[:-1])[0]
+			states, actions, targets, next_log_probs, dones = [x.view(x.size(0)*x.size(1), *x.size()[2:]).cpu().numpy() for x in (states[:-1], actions[:-1], targets, log_probs[1:], dones)]
+			self.replay_buffer.extend(list(zip(states, actions, targets, next_log_probs, dones)), shuffle=False)	
+		if len(self.replay_buffer) > REPLAY_BATCH_SIZE:
+			states, actions, targets, next_log_probs, dones = self.replay_buffer.sample(REPLAY_BATCH_SIZE, dtype=self.to_tensor)[0]
+			self.network.optimize(states, actions, targets, next_log_probs, dones)
+
+REG_LAMBDA = 1e-6             	# Penalty multiplier to apply for the size of the network weights
+LEARN_RATE = 0.0001           	# Sets how much we want to update the network weights at each training step
+TARGET_UPDATE_RATE = 0.0004   	# How frequently we want to copy the local network to the target network (for double DQNs)
+INPUT_LAYER = 512				# The number of output nodes from the first layer to Actor and Critic networks
+ACTOR_HIDDEN = 256				# The number of nodes in the hidden layers of the Actor network
+CRITIC_HIDDEN = 1024			# The number of nodes in the hidden layers of the Critic networks
+DISCOUNT_RATE = 0.99			# The discount rate to use in the Bellman Equation
+NUM_STEPS = 500					# The number of steps to collect experience in sequence for each GAE calculation
+EPS_MAX = 1.0                 	# The starting proportion of random to greedy actions to take
+EPS_MIN = 0.020               	# The lower limit proportion of random to greedy actions to take
+EPS_DECAY = 0.980             	# The rate at which eps decays from EPS_MAX to EPS_MIN
+ADVANTAGE_DECAY = 0.95			# The discount factor for the cumulative GAE calculation
+REPLAY_BATCH_SIZE = 32        	# How many experience tuples to sample from the buffer for each train step
+MAX_BUFFER_SIZE = 100000      	# Sets the maximum length of the replay buffer
+SAVE_DIR = "./saved_models"
+
+import os
+import gym
+import torch
+import argparse
+import numpy as np
+from envs import make_env, all_envs, env_name
+from models import all_models, EPS_MIN
+from utils.rand import RandomAgent
+from utils.misc import Logger, rollout
+from utils.envs import EnsembleEnv, EnvManager, EnvWorker
+from utils.wrappers import WorldACAgent
+from utils.multiprocess import set_rank_size
+
+TRIAL_AT = 1000
+SAVE_AT = 1
+
+def train(make_env, model, ports, steps, checkpoint=None, save_best=True, log=True, render=False, worldmodel=True):
+	envs = (EnvManager if len(ports)>0 else EnsembleEnv)(make_env, ports if ports else 4)
+	agent = WorldACAgent(envs.state_size, envs.action_size, model, envs.num_envs, load=checkpoint, gpu=True, worldmodel=worldmodel) 
+	logger = Logger(model, checkpoint, num_envs=envs.num_envs, state_size=agent.state_size, action_size=envs.action_size, action_space=envs.env.action_space, envs=type(envs), statemodel=agent.state_model)
+	states = envs.reset(train=True)
+	total_rewards = []
+	for s in range(steps+1):
+		env_actions, actions, states = agent.get_env_action(envs.env, states)
+		next_states, rewards, dones, _ = envs.step(env_actions, train=True)
+		agent.train(states, actions, next_states, rewards, dones)
+		states = next_states
+		if s%TRIAL_AT==0:
+			rollouts = rollout(envs, agent, render=render)
+			total_rewards.append(np.round(np.mean(rollouts, axis=-1), 3))
+			if checkpoint and len(total_rewards)%SAVE_AT==0: agent.save_model(checkpoint)
+			if checkpoint and save_best and np.all(total_rewards[-1] >= np.max(total_rewards, axis=-1)): agent.save_model(checkpoint, "best")
+			if log: logger.log(f"Step: {s:7d}, Reward: {total_rewards[-1]} [{np.std(rollouts):4.3f}], Avg: {round(np.mean(total_rewards, axis=0),3)} ({agent.acagent.eps:.4f})")
+	envs.close()
+
+def trial(make_env, model, checkpoint=None, render=False):
+	envs = EnsembleEnv(make_env, 1)
+	agent = WorldACAgent(envs.state_size, envs.action_size, model, envs.num_envs, load="", train=False, gpu=False, worldmodel=True).load(checkpoint)
+	print(f"Reward: {rollout(envs, agent, eps=EPS_MIN, render=render)}")
+	envs.close()
+
+def parse_args(all_envs, all_models):
+	parser = argparse.ArgumentParser(description="A3C Trainer")
+	parser.add_argument("--env_name", type=str, default=env_name, choices=all_envs, help="Name of the environment to use. Allowed values are:\n"+', '.join(all_envs), metavar="env_name")
+	parser.add_argument("--model", type=str, default="ppo", choices=all_models, help="Which RL algorithm to use. Allowed values are:\n"+', '.join(all_models), metavar="model")
+	parser.add_argument("--iternum", type=int, default=-1, choices=[-1,0,1], help="Whether to train using World Model to load (0 or 1) or raw images (-1)")
+	parser.add_argument("--tcp_ports", type=int, default=[], nargs="+", help="The list of worker ports to connect to")
+	parser.add_argument("--tcp_rank", type=int, default=0, help="Which port to listen on (as a worker server)")
+	parser.add_argument("--render", action="store_true", help="Whether to render an environment rollout")
+	parser.add_argument("--trial", action="store_true", help="Whether to show a trial run training on the Pendulum-v0 environment")
+	parser.add_argument("--steps", type=int, default=100000, help="Number of steps to train the agent")
+	args = parser.parse_args()
+	return args
+
+if __name__ == "__main__":
+	args = parse_args(all_envs, all_models.keys())
+	checkpoint = f"{args.env_name}/pytorch" if args.iternum < 0 else f"{args.env_name}/iter{args.iternum}"
+	rank, size = set_rank_size(args.tcp_rank, args.tcp_ports)
+	get_env = lambda: make_env(args.env_name, args.render)
+	model = all_models[args.model]
+	if rank>0:
+		EnvWorker(make_env=get_env).start()
+	elif args.trial:
+		trial(make_env=get_env, model=model, checkpoint=checkpoint, render=args.render)
+	else:
+		train(make_env=get_env, model=model, ports=list(range(1,size)), steps=args.steps, checkpoint=checkpoint, render=args.render, worldmodel=args.iternum>=0)
+
+
+Step:       0, Reward: -14.714 [17.776], Avg: -14.714 (1.0000) <0-00:00:00> 
+Step:    1000, Reward: -23.585 [13.375], Avg: -19.15 (1.0000) <0-00:00:45> 
+Step:    2000, Reward: -24.739 [11.796], Avg: -21.013 (1.0000) <0-00:01:44> 
+Step:    3000, Reward: -21.5 [14.550], Avg: -21.134 (1.0000) <0-00:03:04> 
+Step:    4000, Reward: -21.518 [14.380], Avg: -21.211 (1.0000) <0-00:04:23> 
+Step:    5000, Reward: -25.638 [13.870], Avg: -21.949 (1.0000) <0-00:05:43> 
+Step:    6000, Reward: -20.609 [15.360], Avg: -21.758 (1.0000) <0-00:07:03> 
+Step:    7000, Reward: -24.362 [14.110], Avg: -22.083 (1.0000) <0-00:08:23> 
+Step:    8000, Reward: -17.703 [19.983], Avg: -21.596 (1.0000) <0-00:09:43> 
+Step:    9000, Reward: -19.637 [14.892], Avg: -21.4 (1.0000) <0-00:11:03> 
+Step:   10000, Reward: -18.238 [15.443], Avg: -21.113 (1.0000) <0-00:12:23> 
+Step:   11000, Reward: -29.271 [5.000], Avg: -21.793 (1.0000) <0-00:13:43> 
+Step:   12000, Reward: -19.925 [16.395], Avg: -21.649 (1.0000) <0-00:15:03> 
+Step:   13000, Reward: -24.551 [13.407], Avg: -21.856 (1.0000) <0-00:16:23> 
+Step:   14000, Reward: -17.986 [16.973], Avg: -21.598 (1.0000) <0-00:17:43> 
+Step:   15000, Reward: -19.548 [19.729], Avg: -21.47 (1.0000) <0-00:19:03> 
+Step:   16000, Reward: -14.91 [22.191], Avg: -21.084 (1.0000) <0-00:20:22> 
+Step:   17000, Reward: -62.381 [23.191], Avg: -23.379 (1.0000) <0-00:21:42> 
+Step:   18000, Reward: -78.023 [2.625], Avg: -26.255 (1.0000) <0-00:23:03> 
+Step:   19000, Reward: -125.843 [16.633], Avg: -31.234 (1.0000) <0-00:24:23> 
+Step:   20000, Reward: -143.756 [30.751], Avg: -36.592 (1.0000) <0-00:25:43> 
+Step:   21000, Reward: -121.736 [33.060], Avg: -40.462 (1.0000) <0-00:27:03> 
+Step:   22000, Reward: -124.686 [29.818], Avg: -44.124 (1.0000) <0-00:28:23> 
+Step:   23000, Reward: -64.442 [12.992], Avg: -44.971 (1.0000) <0-00:29:43> 
+Step:   24000, Reward: -59.49 [19.812], Avg: -45.552 (1.0000) <0-00:31:03> 
+Step:   25000, Reward: -81.468 [1.755], Avg: -46.933 (1.0000) <0-00:32:22> 
+Step:   26000, Reward: -19.642 [37.154], Avg: -45.922 (1.0000) <0-00:33:42> 
+Step:   27000, Reward: -6.288 [37.459], Avg: -44.507 (1.0000) <0-00:35:02> 
+Step:   28000, Reward: 15.011 [32.579], Avg: -42.454 (1.0000) <0-00:36:22> 
+Step:   29000, Reward: 29.729 [59.260], Avg: -40.048 (1.0000) <0-00:37:43> 
+Step:   30000, Reward: -54.454 [4.055], Avg: -40.513 (1.0000) <0-00:39:03> 
+Step:   31000, Reward: -26.801 [39.423], Avg: -40.085 (1.0000) <0-00:40:23> 
+Step:   32000, Reward: 0.231 [61.376], Avg: -38.863 (1.0000) <0-00:41:44> 
+Step:   33000, Reward: -15.35 [55.244], Avg: -38.171 (1.0000) <0-00:43:04> 
+Step:   34000, Reward: 15.084 [72.244], Avg: -36.65 (1.0000) <0-00:44:24> 
+Step:   35000, Reward: 144.838 [114.412], Avg: -31.608 (1.0000) <0-00:45:43> 
+Step:   36000, Reward: 77.241 [72.814], Avg: -28.666 (1.0000) <0-00:47:03> 
+Step:   37000, Reward: 51.158 [87.088], Avg: -26.566 (1.0000) <0-00:48:22> 
+Step:   38000, Reward: -1.424 [37.877], Avg: -25.921 (1.0000) <0-00:49:42> 
+Step:   39000, Reward: 91.565 [152.105], Avg: -22.984 (1.0000) <0-00:51:01> 
+Step:   40000, Reward: -36.476 [10.579], Avg: -23.313 (1.0000) <0-00:52:21> 
+Step:   41000, Reward: 7.665 [52.328], Avg: -22.576 (1.0000) <0-00:53:40> 
+Step:   42000, Reward: 17.428 [111.962], Avg: -21.645 (1.0000) <0-00:55:01> 
+Step:   43000, Reward: 117.515 [155.192], Avg: -18.482 (1.0000) <0-00:56:20> 
+Step:   44000, Reward: 145.642 [124.350], Avg: -14.835 (1.0000) <0-00:57:41> 
+Step:   45000, Reward: 166.717 [105.129], Avg: -10.888 (1.0000) <0-00:59:01> 
+Step:   46000, Reward: 57.359 [75.185], Avg: -9.436 (1.0000) <0-01:00:21> 
+Step:   47000, Reward: 228.031 [190.181], Avg: -4.489 (1.0000) <0-01:01:41> 
+Step:   48000, Reward: 215.368 [129.680], Avg: -0.002 (1.0000) <0-01:03:01> 
+Step:   49000, Reward: 219.859 [101.164], Avg: 4.395 (1.0000) <0-01:04:21> 
+Step:   50000, Reward: 151.551 [106.208], Avg: 7.28 (1.0000) <0-01:05:41> 
+Step:   51000, Reward: 157.48 [88.467], Avg: 10.169 (1.0000) <0-01:07:00> 
+Step:   52000, Reward: 281.954 [176.080], Avg: 15.297 (1.0000) <0-01:08:21> 
+Step:   53000, Reward: 205.913 [114.453], Avg: 18.827 (1.0000) <0-01:09:41> 
+Step:   54000, Reward: 140.091 [83.404], Avg: 21.032 (1.0000) <0-01:11:02> 
+Step:   55000, Reward: 143.784 [78.395], Avg: 23.224 (1.0000) <0-01:12:24> 
+Step:   56000, Reward: 162.617 [99.879], Avg: 25.669 (1.0000) <0-01:13:44> 
+Step:   57000, Reward: 212.071 [83.207], Avg: 28.883 (1.0000) <0-01:15:04> 
