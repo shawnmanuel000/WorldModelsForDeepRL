@@ -1,8 +1,9 @@
-Model: <class 'models.singleagent.sac.SACAgent'>, Env: CarRacing-v0/iter0, Date: 24/03/2020 11:32:28
+Model: <class 'models.singleagent.sac.SACAgent'>, Env: CarRacing-v0/iter1, Date: 24/03/2020 11:42:32
 CPU: 20 Core, 0.0GHz, 377.59 GB, Linux-4.14.167-llgrid-10ms-x86_64-with-debian-buster-sid
 GPU 0: Tesla V100-PCIE-32GB, 32.51 GB (Driver: 440.33.01)
+GPU 1: Tesla V100-PCIE-32GB, 32.51 GB (Driver: 440.33.01)
 Git URL: git@github.com:shawnmanuel000/WorldModelsForDeepRL.git
-Hash: 85a3a8d8269345baa99498234ae9dba1f0a35ddc
+Hash: 324df3420c16a17c0d570840c0f019647b6be7aa
 Branch: master
 
 num_envs: 16,
@@ -10,7 +11,7 @@ state_size: (96, 96, 3),
 action_size: (3,),
 action_space: Box(3,),
 envs: <class 'utils.envs.EnvManager'>,
-statemodel: <utils.wrappers.WorldModel object at 0x7f10d1905b38>,
+statemodel: <utils.wrappers.WorldModel object at 0x7f36a8b28b38>,
 
 import torch
 import numpy as np
@@ -211,33 +212,14 @@ if __name__ == "__main__":
 		train(make_env=get_env, model=model, ports=list(range(1,size)), steps=args.steps, checkpoint=checkpoint, render=args.render, worldmodel=args.iternum>=0)
 
 
-Step:       0, Reward: -22.751 [12.719], Avg: -22.751 (1.0000) <0-00:00:00> 
-Step:    1000, Reward: -22.829 [13.165], Avg: -22.79 (1.0000) <0-00:00:46> 
-Step:    2000, Reward: -22.591 [15.821], Avg: -22.724 (1.0000) <0-00:01:37> 
-Step:    3000, Reward: -20.684 [16.650], Avg: -22.214 (1.0000) <0-00:02:27> 
-Step:    4000, Reward: -23.341 [14.053], Avg: -22.439 (1.0000) <0-00:03:18> 
-Step:    5000, Reward: -19.484 [13.902], Avg: -21.947 (1.0000) <0-00:04:08> 
-Step:    6000, Reward: -23.488 [12.050], Avg: -22.167 (1.0000) <0-00:04:59> 
-Step:    7000, Reward: -26.241 [10.035], Avg: -22.676 (1.0000) <0-00:06:00> 
-Step:    8000, Reward: -23.604 [14.852], Avg: -22.779 (1.0000) <0-00:06:51> 
-Step:    9000, Reward: -22.727 [14.515], Avg: -22.774 (1.0000) <0-00:07:42> 
-Step:   10000, Reward: -15.227 [19.690], Avg: -22.088 (1.0000) <0-00:08:43> 
-Step:   11000, Reward: -26.088 [15.298], Avg: -22.421 (1.0000) <0-00:09:34> 
-Step:   12000, Reward: -27.691 [12.469], Avg: -22.827 (1.0000) <0-00:10:25> 
-Step:   13000, Reward: -20.966 [13.298], Avg: -22.694 (1.0000) <0-00:11:15> 
-Step:   14000, Reward: -20.359 [17.718], Avg: -22.538 (1.0000) <0-00:12:06> 
-Step:   15000, Reward: -24.034 [15.481], Avg: -22.632 (1.0000) <0-00:12:56> 
-Step:   16000, Reward: -28.425 [6.077], Avg: -22.972 (1.0000) <0-00:13:47> 
-Step:   17000, Reward: -0.294 [34.213], Avg: -21.712 (1.0000) <0-00:14:38> 
-Step:   18000, Reward: -21.053 [15.050], Avg: -21.678 (1.0000) <0-00:15:28> 
-Step:   19000, Reward: -138.569 [36.611], Avg: -27.522 (1.0000) <0-00:16:19> 
-Step:   20000, Reward: -79.391 [1.696], Avg: -29.992 (1.0000) <0-00:17:09> 
-Step:   21000, Reward: -125.112 [38.405], Avg: -34.316 (1.0000) <0-00:18:00> 
-Step:   22000, Reward: -135.626 [26.168], Avg: -38.721 (1.0000) <0-00:18:50> 
-Step:   23000, Reward: -113.592 [12.849], Avg: -41.84 (1.0000) <0-00:19:35> 
-Step:   24000, Reward: -82.393 [1.523], Avg: -43.462 (1.0000) <0-00:20:25> 
-Step:   25000, Reward: -128.168 [43.207], Avg: -46.72 (1.0000) <0-00:21:15> 
-Step:   26000, Reward: -56.875 [9.964], Avg: -47.096 (1.0000) <0-00:22:06> 
-Step:   27000, Reward: -125.106 [38.965], Avg: -49.882 (1.0000) <0-00:22:57> 
-Step:   28000, Reward: -59.979 [19.059], Avg: -50.231 (1.0000) <0-00:23:48> 
-Step:   29000, Reward: -47.171 [10.656], Avg: -50.129 (1.0000) <0-00:24:39> 
+Step:       0, Reward: -23.591 [10.835], Avg: -23.591 (1.0000) <0-00:00:00> 
+Step:    1000, Reward: -19.715 [17.293], Avg: -21.653 (1.0000) <0-00:01:16> 
+Step:    2000, Reward: -24.03 [14.265], Avg: -22.445 (1.0000) <0-00:02:41> 
+Step:    3000, Reward: -15.956 [18.546], Avg: -20.823 (1.0000) <0-00:04:05> 
+Step:    4000, Reward: -22.125 [13.493], Avg: -21.083 (1.0000) <0-00:05:29> 
+Step:    5000, Reward: -23.65 [11.336], Avg: -21.511 (1.0000) <0-00:06:55> 
+Step:    6000, Reward: -18.782 [17.095], Avg: -21.121 (1.0000) <0-00:08:20> 
+Step:    7000, Reward: -15.712 [18.257], Avg: -20.445 (1.0000) <0-00:09:44> 
+Step:    8000, Reward: -17.783 [17.240], Avg: -20.149 (1.0000) <0-00:11:09> 
+Step:    9000, Reward: -27.674 [12.190], Avg: -20.902 (1.0000) <0-00:12:35> 
+Step:   10000, Reward: -21.841 [11.424], Avg: -20.987 (1.0000) <0-00:13:59> 
