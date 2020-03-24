@@ -21,4 +21,4 @@ export DISPLAY=':99.0'
 Xvfb :99 -screen 0 1400x900x24 > /dev/null 2>&1 &
 
 # Call your script as you would from the command line
-mpirun python -B train_a3c.py --env_name CarRacing-v0 --model ddpg --iter -1 --steps 500000
+mpirun python -B train_a3c.py --env_name CarRacing-v0 --model sac --iter -1 --steps 500000
