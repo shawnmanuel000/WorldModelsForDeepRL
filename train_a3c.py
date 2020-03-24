@@ -35,7 +35,7 @@ def train(make_env, model, ports, steps, checkpoint=None, save_best=True, log=Tr
 
 def trial(make_env, model, checkpoint=None, render=False):
 	envs = EnsembleEnv(make_env, 1)
-	agent = WorldACAgent(envs.state_size, envs.action_size, model, envs.num_envs, load="", train=False, gpu=False, worldmodel=True).load(checkpoint)
+	agent = WorldACAgent(envs.state_size, envs.action_size, model, envs.num_envs, load=checkpoint, train=False, gpu=False, worldmodel=True)
 	print(f"Reward: {rollout(envs, agent, eps=EPS_MIN, render=render)}")
 	envs.close()
 
