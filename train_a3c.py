@@ -14,9 +14,9 @@ from utils.multiprocess import set_rank_size
 TRIAL_AT = 1000
 SAVE_AT = 1
 
-def train(make_env, model, ports, steps, checkpoint=None, save_best=False, log=True, render=False):
+def train(make_env, model, ports, steps, checkpoint=None, save_best=False, log=True, render=False, worldmodel=True):
 	envs = (EnvManager if len(ports)>0 else EnsembleEnv)(make_env, ports if ports else 4)
-	agent = WorldACAgent(envs.state_size, envs.action_size, model, envs.num_envs, load=checkpoint, gpu=True, worldmodel=True) 
+	agent = WorldACAgent(envs.state_size, envs.action_size, model, envs.num_envs, load=checkpoint, gpu=True, worldmodel=worldmodel) 
 	logger = Logger(model, checkpoint, num_envs=envs.num_envs, state_size=agent.state_size, action_size=envs.action_size, action_space=envs.env.action_space, envs=type(envs), statemodel=agent.state_model)
 	states = envs.reset(train=True)
 	total_rewards = []
@@ -63,4 +63,4 @@ if __name__ == "__main__":
 	elif args.trial:
 		trial(make_env=get_env, model=model, checkpoint=checkpoint, render=args.render)
 	else:
-		train(make_env=get_env, model=model, ports=list(range(1,size)), steps=args.steps, checkpoint=checkpoint, render=args.render)
+		train(make_env=get_env, model=model, ports=list(range(1,size)), steps=args.steps, checkpoint=checkpoint, render=args.render, worldmodel=args.iternum>=0)

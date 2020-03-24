@@ -39,7 +39,7 @@ run()
 	do
 		open_terminal "python3 -B train_a3c.py --env_name $env --iternum $iter --model $agent --steps $steps --tcp_rank $j --tcp_ports $port_string" &
 	done
-	sleep 6
+	sleep 60
 	python3 -B train_a3c.py --env_name $env --iternum $iter --model $agent --steps $steps --tcp_rank 0 --tcp_ports $port_string
 }
 

@@ -1,11 +1,11 @@
 import pickle
 import numpy as np
 import socket as Socket
-from mpi4py import MPI
+# from mpi4py import MPI
 
-MPI_COMM = MPI.COMM_WORLD
-MPI_SIZE = MPI_COMM.Get_size()
-MPI_RANK = MPI_COMM.Get_rank()
+# MPI_COMM = MPI.COMM_WORLD
+MPI_SIZE = 1# MPI_COMM.Get_size()
+MPI_RANK = 0#MPI_COMM.Get_rank()
 TCP_PORTS = None
 TCP_SIZE = 0
 TCP_RANK = 0
