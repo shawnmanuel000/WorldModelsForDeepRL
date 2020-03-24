@@ -85,12 +85,15 @@ def graph_a3c(model="ddpg", logs=ddpgs):
 	plt.ylabel("Total Score")
 	plt.grid(linewidth=0.3, linestyle='-')
 
+def graph_CDC():
+	model = ""
+
 def main():
-	graph_ctrl()
-	plt.figure()
-	graph_a3c("ddpg", ddpgs)
-	plt.figure()
-	graph_a3c("ppo", ppos)
+	# graph_ctrl()
+	# plt.figure()
+	# graph_a3c("ddpg", ddpgs)
+	# plt.figure()
+	# graph_a3c("ppo", ppos)
 	plt.show()
 
 main()

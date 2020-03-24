@@ -95,3 +95,4 @@ class PPOAgent(PTACAgent):
 			for _ in range((len(self.replay_buffer)*PPO_EPOCHS)//BATCH_SIZE):
 				state, action, log_prob, target, advantage = self.replay_buffer.next_batch(BATCH_SIZE, torch.stack)
 				self.network.optimize(state, action, log_prob, target, advantage)
+				

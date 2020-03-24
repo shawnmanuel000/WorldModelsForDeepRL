@@ -99,10 +99,10 @@ class WorldACAgent(RandomAgent):
 		self.state_model.reset(num_envs, restore=False)
 		return self
 
-	def save_model(self, dirname="pytorch", name="best"):
+	def save_model(self, dirname="pytorch", name="checkpoint"):
 		self.acagent.network.save_model(dirname, name)
 
-	def load(self, dirname="pytorch", name="best"):
+	def load(self, dirname="pytorch", name="checkpoint"):
 		self.state_model.load_model(dirname, name)
 		self.acagent.network.load_model(dirname, name)
 		return self
