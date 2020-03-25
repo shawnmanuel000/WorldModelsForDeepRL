@@ -25,16 +25,17 @@ ppos = [ppo0, ppo1, ppo]
 
 def read_ctrl(path):
 	bests = []
-	avgs = deque(maxlen=100)
 	rolling = []
+	avgs = deque(maxlen=100)
 	with open(path, "r") as f:
 		for line in f:
-			match = re.match("Ep.*score: (.*), Min: (.*), Avg: (.*)", line.strip('\n'))
+			match = re.match("Ep.*score: (.*), Min: (.*), Avg: ([^,]*)", line.strip('\n'))
 			if match:
-				bests.append(float(match.groups()[0]))
-				avgs.append(float(match.groups()[0]))
+				bests.append(float(match.groups()[2]))
+				avgs.append(float(match.groups()[2]))
 				rolling.append(np.mean(avgs))
-	return bests, rollings
+				while len(avgs)<100: avgs.append(avgs[-1])
+	return bests, rolling, [1000*s for s in range(len(rolling))]
 
 def read_a3c(path):
 	rewards = []
@@ -52,17 +53,17 @@ def read_a3c(path):
 def read_cdc(path):
 	steps = []
 	rewards = []
-	avgs = deque(maxlen=100)
 	rolling = []
+	avgs = deque(maxlen=100)
 	with open(path, "r") as f:
 		for line in f:
 			match = re.match("^Step:\s*([0-9]+), Reward: ([^ ]*) ", line.strip('\n'))
-			# print(line)
 			if match:
 				steps.append(int(match.groups()[0]))
 				rewards.append(float(match.groups()[1]))
 				avgs.append(float(match.groups()[1]))
 				rolling.append(np.mean(avgs))
+				while len(avgs)<100: avgs.append(avgs[-1])
 	return rewards, rolling, steps
 
 def graph_ctrl():
@@ -103,25 +104,35 @@ def graph_a3c(model="ddpg", logs=ddpgs):
 
 def graph_CDC():
 	logs = {
-		"ctrl": {"CarRacing-v0": {"pytorch":-1, "iter1": -1}, "take_cover": {"pytorch": 1, "iter1": 2}, "defend_the_line": {"pytorch": -1, "iter1": 1}},
-		"ddpg": {"CarRacing-v0": {"pytorch": 6, "iter1": 61}, "take_cover": {"pytorch": 2, "iter1": 1}, "defend_the_line": {"pytorch": 2, "iter1": 0}},
-		"ddqn": {"CarRacing-v0": {"pytorch":-1, "iter1": -1}, "take_cover": {"pytorch": 1, "iter1": 2}, "defend_the_line": {"pytorch": -1, "iter1": 1}},
-		"ppo":  {"CarRacing-v0": {"pytorch": 4, "iter1": 28}, "take_cover": {"pytorch": 4, "iter1": 0}, "defend_the_line": {"pytorch": 3, "iter1": 1}},
-		"sac":  {"CarRacing-v0": {"pytorch": 5, "iter1":  5}, "take_cover": {"pytorch": 1, "iter1": 0}, "defend_the_line": {"pytorch": 0, "iter1": 0}}
+		"ctrl": {"CarRacing-v0": {"pytorch":-1, "iter0":-1, "iter1":  9}, "take_cover": {"pytorch":-1, "iter0": 3, "iter1":-1}, "defend_the_line": {"pytorch":-1, "iter0":-1, "iter1": 1}},
+		"ddpg": {"CarRacing-v0": {"pytorch": 3, "iter0":-1, "iter1": 28}, "take_cover": {"pytorch": 4, "iter0": 0, "iter1":-1}, "defend_the_line": {"pytorch": 3, "iter0":-1, "iter1": 1}},
+		"ddqn": {"CarRacing-v0": {"pytorch":-1, "iter0":-1, "iter1": -1}, "take_cover": {"pytorch": 1, "iter0": 2, "iter1":-1}, "defend_the_line": {"pytorch":-1, "iter0":-1, "iter1": 1}},
+		"ppo":  {"CarRacing-v0": {"pytorch": 5, "iter0":-1, "iter1": 61}, "take_cover": {"pytorch": 2, "iter0": 1, "iter1":-1}, "defend_the_line": {"pytorch": 2, "iter0":-1, "iter1": 0}},
+		"sac":  {"CarRacing-v0": {"pytorch": 4, "iter0":-1, "iter1":  4}, "take_cover": {"pytorch": 1, "iter0": 0, "iter1":-1}, "defend_the_line": {"pytorch": 0, "iter0":-1, "iter1": 0}}
 	}
 	env_names = ["CarRacing-v0", "take_cover", "defend_the_line"]
 	models = ["ctrl", "ddqn", "ddpg", "ppo", "sac"]
-	light_cols = ["#EEEEEE", "#ADFF2F", "#00BFFF", "#FF1493", "#FFED00"]
-	dark_cols = ["#888888", "#008000", "#0000CD", "#FF0000", "#FFA500"]
-	iternums = ["pytorch", "iter1"]
+	lighter_cols = ["#EEEEEE", "#FFED44", "#44DFFF", "#FF4493", "#BDFF4F"]
+	light_cols = ["#CCCCCC", "#FFED00", "#00BFFF", "#FF1493", "#ADFF2F"]
+	dark_cols = ["#777777", "#FFA500", "#0000CD", "#FF0000", "#008000"]
+	iternums = ["pytorch", "iter0", "iter1"]
 	for env_name in env_names:
 		for it in iternums:
-			for model in models:
-				files = [61]
-				dirname = f"{model}/{env_name}/{it}"
-				rewards, rolling, steps = zip(*[(read_ctrl if j==0 else read_cdc)(f"./logs/{dirname}/logs_{f}.txt") for j,f in enumerate(files)])
-				plt.plot(steps[0], rewards[0], color="#ADFF2F", linewidth=0.5, label="Best of Baseline")
-				plt.plot(steps[0], rolling[0], color="#008000", label="Avg of Baseline")
+			for m,model in enumerate(models):
+				files = [logs[model][env_name][it]]
+				if files[0] >= 0:
+					wm = "iter" in it
+					tag = "(WM)" if wm else "(Conv)"
+					dirname = f"./logs/{model}/{env_name}/{it}/logs_{files[0]}.txt"
+					rewards, rolling, steps = zip(*[(read_ctrl if m==0 else read_cdc)(dirname) for j,f in enumerate(files)])
+					plt.plot(steps[0], rewards[0], ls="-" if wm else ":", color=light_cols[m], linewidth=0.5, zorder=0)
+					plt.plot(steps[0], rolling[0], ls="-" if wm else "--", color=dark_cols[m], label=f"Avg {model.upper()} {tag}", zorder=1)
+					print(dirname)
+		plt.title(f"Average Training Rewards for {env_name}")
+		plt.xlabel("Environment Step")
+		plt.ylabel("Evaluation Reward")
+		plt.legend()
+		plt.show()
 
 
 def main():
