@@ -34,7 +34,7 @@ def read_ctrl(path):
 				bests.append(float(match.groups()[0]))
 				avgs.append(float(match.groups()[0]))
 				rolling.append(np.mean(avgs))
-	return bests, rolling
+	return bests, rollings
 
 def read_a3c(path):
 	rewards = []
@@ -48,6 +48,22 @@ def read_a3c(path):
 				avgs.append(float(match.groups()[0]))
 				rolling.append(np.mean(avgs))
 	return rewards, rolling
+
+def read_cdc(path):
+	steps = []
+	rewards = []
+	avgs = deque(maxlen=100)
+	rolling = []
+	with open(path, "r") as f:
+		for line in f:
+			match = re.match("^Step:\s*([0-9]+), Reward: ([^ ]*) ", line.strip('\n'))
+			# print(line)
+			if match:
+				steps.append(int(match.groups()[0]))
+				rewards.append(float(match.groups()[1]))
+				avgs.append(float(match.groups()[1]))
+				rolling.append(np.mean(avgs))
+	return rewards, rolling, steps
 
 def graph_ctrl():
 	bests, rolling = zip(*[read_ctrl(f"./logs/controller/{path}") for path in ctrls])
@@ -86,7 +102,27 @@ def graph_a3c(model="ddpg", logs=ddpgs):
 	plt.grid(linewidth=0.3, linestyle='-')
 
 def graph_CDC():
-	model = ""
+	logs = {
+		"ctrl": {"CarRacing-v0": {"pytorch":-1, "iter1": -1}, "take_cover": {"pytorch": 1, "iter1": 2}, "defend_the_line": {"pytorch": -1, "iter1": 1}},
+		"ddpg": {"CarRacing-v0": {"pytorch": 6, "iter1": 61}, "take_cover": {"pytorch": 2, "iter1": 1}, "defend_the_line": {"pytorch": 2, "iter1": 0}},
+		"ddqn": {"CarRacing-v0": {"pytorch":-1, "iter1": -1}, "take_cover": {"pytorch": 1, "iter1": 2}, "defend_the_line": {"pytorch": -1, "iter1": 1}},
+		"ppo":  {"CarRacing-v0": {"pytorch": 4, "iter1": 28}, "take_cover": {"pytorch": 4, "iter1": 0}, "defend_the_line": {"pytorch": 3, "iter1": 1}},
+		"sac":  {"CarRacing-v0": {"pytorch": 5, "iter1":  5}, "take_cover": {"pytorch": 1, "iter1": 0}, "defend_the_line": {"pytorch": 0, "iter1": 0}}
+	}
+	env_names = ["CarRacing-v0", "take_cover", "defend_the_line"]
+	models = ["ctrl", "ddqn", "ddpg", "ppo", "sac"]
+	light_cols = ["#EEEEEE", "#ADFF2F", "#00BFFF", "#FF1493", "#FFED00"]
+	dark_cols = ["#888888", "#008000", "#0000CD", "#FF0000", "#FFA500"]
+	iternums = ["pytorch", "iter1"]
+	for env_name in env_names:
+		for it in iternums:
+			for model in models:
+				files = [61]
+				dirname = f"{model}/{env_name}/{it}"
+				rewards, rolling, steps = zip(*[(read_ctrl if j==0 else read_cdc)(f"./logs/{dirname}/logs_{f}.txt") for j,f in enumerate(files)])
+				plt.plot(steps[0], rewards[0], color="#ADFF2F", linewidth=0.5, label="Best of Baseline")
+				plt.plot(steps[0], rolling[0], color="#008000", label="Avg of Baseline")
+
 
 def main():
 	# graph_ctrl()
@@ -94,6 +130,7 @@ def main():
 	# graph_a3c("ddpg", ddpgs)
 	# plt.figure()
 	# graph_a3c("ppo", ppos)
+	graph_CDC()
 	plt.show()
 
 main()
