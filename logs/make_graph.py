@@ -1,27 +1,17 @@
 import os
 import re
 import numpy as np
-import matplotlib.pylab as plt
 from collections import deque
+import matplotlib.pylab as plt
+import matplotlib
+# matplotlib.use("pgf")
+# matplotlib.rcParams.update({
+#     "pgf.texsystem": "pdflatex",
+#     'font.family': 'serif',
+#     'text.usetex': True,
+#     'pgf.rcfonts': False,
+# })
 
-ctrl = "logs_0.txt"
-ctrl0 = "logs_10.txt"
-ctrl1 = "logs_9.txt"
-
-ddpg = "logs_11.txt"
-# ddpg0 = "logs_10.txt"
-ddpg0 = "iter1/logs_3.txt"
-# ddpg1 = "logs_8.txt"
-ddpg1 = "iter1/logs_6.txt"
-
-ppo = "logs_13.txt"
-ppo0 = "logs_11.txt"
-ppo1 = "logs_15.txt"
-# ppo1 = "iter1/logs_2.txt"
-
-ctrls = [ctrl0, ctrl1, ctrl]
-ddpgs = [ddpg0, ddpg1, ddpg]
-ppos = [ppo0, ppo1, ppo]
 
 def read_ctrl(path):
 	bests = []
@@ -57,7 +47,7 @@ def read_cdc(path):
 	avgs = deque(maxlen=100)
 	with open(path, "r") as f:
 		for line in f:
-			match = re.match("^Step:\s*([0-9]+), Reward: ([^ ]*) ", line.strip('\n'))
+			match = re.match("^Step:\s*([0-9]+),.* Reward: ([^ ]*) ", line.strip('\n'))
 			if match:
 				steps.append(int(match.groups()[0]))
 				rewards.append(float(match.groups()[1]))
@@ -83,7 +73,7 @@ def graph_ctrl():
 	plt.ylabel("Best Total Score")
 	plt.grid(linewidth=0.3, linestyle='-')
 
-def graph_a3c(model="ddpg", logs=ddpgs):
+def graph_a3c(model, logs):
 	# _, ravgs = read_a3c("./logs/qlearning/random.txt")
 	rewards, qavgs = zip(*[read_a3c(f"./logs/{model}/{path}") for path in logs])
 	plt.plot(range(len(rewards[-1])), rewards[-1], color="#ADFF2F", linewidth=0.5, label="Baseline")
@@ -106,7 +96,7 @@ def graph_CDC():
 	logs = {
 		"ctrl": {"CarRacing-v0": {"pytorch":-1, "iter0":-1, "iter1":  9}, "take_cover": {"pytorch":-1, "iter0": 3, "iter1":-1}, "defend_the_line": {"pytorch":-1, "iter0":-1, "iter1": 1}},
 		"ddpg": {"CarRacing-v0": {"pytorch": 3, "iter0":-1, "iter1": 28}, "take_cover": {"pytorch": 4, "iter0": 0, "iter1":-1}, "defend_the_line": {"pytorch": 3, "iter0":-1, "iter1": 1}},
-		"ddqn": {"CarRacing-v0": {"pytorch":-1, "iter0":-1, "iter1": -1}, "take_cover": {"pytorch": 1, "iter0": 2, "iter1":-1}, "defend_the_line": {"pytorch":-1, "iter0":-1, "iter1": 1}},
+		"ddqn": {"CarRacing-v0": {"pytorch":-1, "iter0":-1, "iter1": -1}, "take_cover": {"pytorch": 1, "iter0": 2, "iter1":-1}, "defend_the_line": {"pytorch": 0, "iter0":-1, "iter1": 1}},
 		"ppo":  {"CarRacing-v0": {"pytorch": 5, "iter0":-1, "iter1": 61}, "take_cover": {"pytorch": 2, "iter0": 1, "iter1":-1}, "defend_the_line": {"pytorch": 2, "iter0":-1, "iter1": 0}},
 		"sac":  {"CarRacing-v0": {"pytorch": 4, "iter0":-1, "iter1":  4}, "take_cover": {"pytorch": 1, "iter0": 0, "iter1":-1}, "defend_the_line": {"pytorch": 0, "iter0":-1, "iter1": 0}}
 	}
@@ -117,6 +107,8 @@ def graph_CDC():
 	dark_cols = ["#777777", "#FFA500", "#0000CD", "#FF0000", "#008000"]
 	iternums = ["pytorch", "iter0", "iter1"]
 	for env_name in env_names:
+		fig = plt.figure()
+		# fig.set_size_inches(w=3.75, h=2.7)
 		for it in iternums:
 			for m,model in enumerate(models):
 				files = [logs[model][env_name][it]]
@@ -131,8 +123,10 @@ def graph_CDC():
 		plt.title(f"Average Training Rewards for {env_name}")
 		plt.xlabel("Environment Step")
 		plt.ylabel("Evaluation Reward")
-		plt.legend()
+		plt.legend(prop={'size': 6})
 		plt.show()
+		plt.savefig(f"./logs/graphs/{env_name}.pdf")
+		# plt.savefig(f"./logs/graphs/{env_name}.png")
 
 
 def main():
@@ -142,6 +136,5 @@ def main():
 	# plt.figure()
 	# graph_a3c("ppo", ppos)
 	graph_CDC()
-	plt.show()
 
 main()
