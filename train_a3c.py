@@ -34,9 +34,10 @@ def train(make_env, model, ports, steps, checkpoint=None, save_best=True, log=Tr
 	envs.close()
 
 def trial(make_env, model, checkpoint=None, render=False):
-	envs = EnsembleEnv(make_env, 1)
+	envs = (EnvManager if len(ports)>0 else EnsembleEnv)(make_env, ports if ports else 4)
 	agent = WorldACAgent(envs.state_size, envs.action_size, model, envs.num_envs, load=checkpoint, train=False, gpu=False, worldmodel=True)
-	print(f"Reward: {rollout(envs, agent, eps=EPS_MIN, render=render)}")
+	rollouts = [rollout(envs, agent, eps=EPS_MIN, render=render) for _ in range(10)]
+	print(f"Reward: {np.mean(rollouts)} +- {np.std(rollouts)}")
 	envs.close()
 
 def parse_args(all_envs, all_models):
