@@ -6,7 +6,7 @@ from utils.network import PTACNetwork, PTACAgent, Conv, INPUT_LAYER, ACTOR_HIDDE
 BATCH_SIZE = 32					# Number of samples to train on for each train step
 PPO_EPOCHS = 2					# Number of iterations to sample batches for training
 ENTROPY_WEIGHT = 0.005			# The weight for the entropy term of the Actor loss
-CLIP_PARAM = 0.1				# The limit of the ratio of new action probabilities to old probabilities
+CLIP_PARAM = 0.05				# The limit of the ratio of new action probabilities to old probabilities
 
 class PPOActor(torch.nn.Module):
 	def __init__(self, state_size, action_size):

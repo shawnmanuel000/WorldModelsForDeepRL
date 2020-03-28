@@ -33,9 +33,9 @@ def train(make_env, model, ports, steps, checkpoint=None, save_best=True, log=Tr
 			if log: logger.log(f"Step: {s:7d}, Reward: {total_rewards[-1]} [{np.std(rollouts):4.3f}], Avg: {round(np.mean(total_rewards, axis=0),3)} ({agent.acagent.eps:.4f})")
 	envs.close()
 
-def trial(make_env, model, checkpoint=None, render=False):
+def trial(make_env, model, ports, steps, checkpoint=None, render=False, worldmodel=True):
 	envs = (EnvManager if len(ports)>0 else EnsembleEnv)(make_env, ports if ports else 4)
-	agent = WorldACAgent(envs.state_size, envs.action_size, model, envs.num_envs, load=checkpoint, train=False, gpu=False, worldmodel=True)
+	agent = WorldACAgent(envs.state_size, envs.action_size, model, envs.num_envs, load=checkpoint, train=False, gpu=True, worldmodel=worldmodel)#.load(checkpoint,"best")
 	rollouts = [rollout(envs, agent, eps=EPS_MIN, render=render) for _ in range(10)]
 	print(f"Reward: {np.mean(rollouts)} +- {np.std(rollouts)}")
 	envs.close()
@@ -61,7 +61,6 @@ if __name__ == "__main__":
 	model = all_models[args.model]
 	if rank>0:
 		EnvWorker(make_env=get_env).start()
-	elif args.trial:
-		trial(make_env=get_env, model=model, checkpoint=checkpoint, render=args.render)
 	else:
-		train(make_env=get_env, model=model, ports=list(range(1,size)), steps=args.steps, checkpoint=checkpoint, render=args.render, worldmodel=args.iternum>=0)
+		function = trial if args.trial else train
+		function(make_env=get_env, model=model, ports=list(range(1,size)), steps=args.steps, checkpoint=checkpoint, render=args.render, worldmodel=args.iternum>=0)
